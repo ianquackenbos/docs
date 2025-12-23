@@ -1,0 +1,595 @@
+---
+title: Auto-Apply
+description: "Automatically apply optimizations with one click"
+---
+
+## Overview
+
+Shardly's **auto-apply** feature is its biggest differentiator. Unlike Elastic AutoOps or other tools that only suggest changes, Shardly can **execute optimizations directly on your Elasticsearch cluster**.
+
+<Frame>
+  <img src="/images/auto-apply-modal.png" alt="Auto-apply modal showing preview, validation results, and apply button for an ILM policy recommendation" />
+</Frame>
+
+<Warning>
+**Auto-apply executes real changes on your Elasticsearch cluster.** Always review the preview and validation results before applying.
+</Warning>
+
+<Tip>
+Elastic AutoOps has no API and cannot programmatically apply changes. Shardly is the only tool that can automatically execute Elasticsearch optimizations.
+</Tip>
+
+## How it works
+
+The auto-apply process follows four stages to ensure safe execution:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        AUTO-APPLY                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│   1. PREVIEW        2. VALIDATE       3. EXECUTE            │
+│   ─────────────     ─────────────     ─────────────         │
+│   • ES Commands     • Cluster OK?     • Run commands        │
+│   • Impact          • Indices OK?     • Track progress      │
+│   • Risk level      • Space OK?       • Capture state       │
+│                     • Conflicts?                             │
+│                                                              │
+│                              ↓                               │
+│                                                              │
+│                     4. VERIFY / ROLLBACK                     │
+│                     ─────────────────────                    │
+│                     • Track savings                          │
+│                     • Compare before/after                   │
+│                     • Rollback if needed                     │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Let's walk through each stage.
+
+## The auto-apply process
+
+<Steps>
+<Step title="Preview the changes">
+Before applying any recommendation, review exactly what will happen to your cluster.
+
+### Elasticsearch commands
+
+You'll see the exact API calls that Shardly will execute:
+
+```json
+PUT /_ilm/policy/shardly-optimized-policy
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_size": "50GB",
+            "max_age": "1d"
+          }
+        }
+      },
+      "warm": {
+        "min_age": "7d",
+        "actions": {
+          "allocate": {
+            "require": { "data": "warm" }
+          }
+        }
+      },
+      "delete": {
+        "min_age": "90d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+```
+
+### Impact summary
+
+Review the scope and expected impact:
+
+| Metric | Value |
+|--------|-------|
+| Affected indices | 23 indices |
+| Risk level | Low |
+| Estimated effort | Medium (15-30 min) |
+| Monthly savings | **$780** |
+
+<Tip>
+Click the **Copy Commands** button to get all commands formatted for Kibana Dev Tools if you prefer to apply manually.
+</Tip>
+
+<Check>
+Review the commands carefully - do the indices and settings look correct?
+</Check>
+</Step>
+
+<Step title="Run validation checks">
+Click **Validate** to run pre-flight safety checks before execution.
+
+### Validation checks performed
+
+<AccordionGroup>
+  <Accordion title="Cluster health check" icon="heart-pulse">
+    **Requirement**: Cluster must be `green` or `yellow`
+    
+    - ✅ `green` - All shards assigned, safe to proceed
+    - ⚠️ `yellow` - Some replicas unassigned, can proceed with caution
+    - ❌ `red` - Primary shards unavailable, **cannot apply changes**
+
+<Warning>
+Shardly will not allow you to apply changes to a red cluster.
+</Warning>
+  </Accordion>
+  
+  <Accordion title="Target indices exist" icon="database">
+    **Requirement**: All target indices must exist
+    
+    Verifies that the indices mentioned in the recommendation still exist and haven't been deleted since the recommendation was generated.
+  </Accordion>
+  
+  <Accordion title="No conflicting operations" icon="traffic-light">
+    **Requirement**: No conflicting operations in progress
+    
+    Checks for concurrent operations that could interfere:
+    - Reindex operations
+    - Shrink/split operations
+    - Force merge operations
+    - Active shard relocations
+    - Snapshot operations
+  </Accordion>
+  
+  <Accordion title="Adequate disk space" icon="hard-drive">
+    **Requirement**: Nodes have sufficient disk space
+    
+    Warns if any node exceeds 85% disk usage, as some operations (like reindexing or adding ILM policies) may temporarily increase disk usage.
+
+<Tip>
+Elasticsearch's disk-based shard allocator starts refusing new shards at 85% and relocating existing shards at 90%.
+</Tip>
+  </Accordion>
+  
+  <Accordion title="Recommendation-specific checks" icon="list-check">
+    Additional validation based on recommendation type:
+    
+    - **ILM Policy**: Verifies ILM is enabled on the cluster
+    - **Tier Migration**: Verifies target tier nodes exist and are available
+    - **Replica Reduction**: Checks cluster can tolerate reduced redundancy
+    - **Shard Count**: Validates new shard count is within reasonable bounds
+  </Accordion>
+</AccordionGroup>
+
+### Validation results
+
+After validation completes, you'll see results for each check:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ✅ Cluster Health        │ Cluster is healthy (green)      │
+├───────────────────────────┼─────────────────────────────────┤
+│  ✅ Target Indices        │ All 23 indices exist            │
+├───────────────────────────┼─────────────────────────────────┤
+│  ✅ Conflicting Ops       │ No conflicts detected           │
+├───────────────────────────┼─────────────────────────────────┤
+│  ⚠️  Disk Space           │ 1 node at 87% usage             │
+├───────────────────────────┼─────────────────────────────────┤
+│  ✅ ILM Enabled           │ ILM is available                │
+└───────────────────────────┴─────────────────────────────────┘
+
+Overall: CAN PROCEED (1 warning)
+```
+
+<Info>
+Warnings won't block execution, but you should review them carefully. Errors will prevent you from applying the recommendation.
+</Info>
+
+<Check>
+All critical validation checks passed
+</Check>
+</Step>
+
+<Step title="Execute the changes">
+Once validation passes, click **Apply Now** to begin execution.
+
+### Real-time progress tracking
+
+Watch each step execute with live status updates:
+
+```
+Executing... Step 2 of 5                              [40%]
+━━━━━━━━━━━━━━━━━━━━━━░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+┌─────────────────────────────────────────────────────────────┐
+│ ✅ Step 1: Capture before snapshot          completed 0.8s │
+├─────────────────────────────────────────────────────────────┤
+│ ⏳ Step 2: Create ILM policy               in_progress ... │
+├─────────────────────────────────────────────────────────────┤
+│ ⏸  Step 3: Update index templates                  pending │
+├─────────────────────────────────────────────────────────────┤
+│ ⏸  Step 4: Apply policy to indices                 pending │
+├─────────────────────────────────────────────────────────────┤
+│ ⏸  Step 5: Capture after snapshot                  pending │
+└─────────────────────────────────────────────────────────────┘
+```
+
+<Frame>
+<img src="/images/execution-progress.png" alt="Real-time execution progress showing step-by-step status with completion times and live updates" />
+</Frame>
+
+### What happens during execution
+
+Shardly performs these actions automatically:
+
+1. **Capture before snapshot** - Records current cluster state including health, index stats, and shard distribution
+2. **Execute API commands** - Runs each Elasticsearch API call in the order defined by the runbook
+3. **Capture after snapshot** - Records new cluster state for comparison
+4. **Update recommendation status** - Marks recommendation as "implemented"
+5. **Initiate savings tracking** - Creates tracking record to verify savings over next 7 days
+
+<Info>
+Execution is asynchronous. You can navigate away from the page - Shardly will continue executing in the background.
+</Info>
+
+### Execution states
+
+| State | Description | What to do |
+|-------|-------------|------------|
+| `pending` | Queued, waiting to start | Wait for execution to begin |
+| `validating` | Running pre-flight checks | Review validation results |
+| `in_progress` | Executing commands | Monitor progress |
+| `completed` | Successfully finished | Review results and savings |
+| `failed` | Error occurred | Check error details, consider rollback |
+| `rolled_back` | Changes were reverted | Investigate cause of failure |
+
+<Check>
+Execution completed successfully without errors
+</Check>
+</Step>
+
+<Step title="Verify savings and rollback if needed">
+After execution completes, Shardly tracks the recommendation to verify actual savings.
+
+### Savings verification (7-day tracking)
+
+Shardly compares before/after metrics over 7 days to verify the recommendation achieved its estimated savings:
+
+```
+Before Implementation:
+  Total Deployment Cost: $12,500/month
+  Affected Indices Cost: $3,200/month
+
+After Implementation (7-day average):
+  Total Deployment Cost: $11,720/month
+  Affected Indices Cost: $2,420/month
+
+Verified Savings: $780/month ✓
+Confidence: 92%
+Tracking Status: Verified
+```
+
+<Frame>
+<img src="/images/savings-verification.png" alt="Savings verification dashboard showing before/after cost comparison and verification status" />
+</Frame>
+
+<Tip>
+Shardly uses a 7-day window to account for weekday/weekend usage patterns and ensure accurate savings calculations.
+</Tip>
+
+### Rolling back changes
+
+If something goes wrong, you can rollback the changes within 30 days of execution:
+
+1. Navigate to the recommendation detail page
+2. Click the **Rollback** button
+3. Confirm you want to revert the changes
+4. Monitor rollback progress
+
+<Warning>
+**Not all changes can be rolled back:**
+
+**Cannot be rolled back:**
+- Deleted indices (data is permanently lost)
+- Merged segments (cannot be unmerged)
+- Force-merged indices (segments stay merged)
+- Closed indices that were deleted
+
+**Can be rolled back:**
+- ILM policy changes (reverts to previous policy)
+- Replica count changes (restores original replica count)
+- Allocation settings (removes routing requirements)
+- Index settings (restores previous values)
+</Warning>
+
+### Rollback process
+
+When you rollback, Shardly:
+
+1. Executes rollback steps defined in the runbook
+2. Reverts recommendation status to "pending"
+3. Updates tracked change record with rollback timestamp
+4. Captures new "after rollback" snapshot for comparison
+
+<Check>
+Verified savings match or exceed the estimated savings
+</Check>
+</Step>
+</Steps>
+
+## Safety features
+
+Shardly includes multiple safety mechanisms to protect your clusters:
+
+<CardGroup cols={2}>
+<Card title="Required validation" icon="shield-check">
+You cannot apply changes without running validation first. Skip validation only if you explicitly check the "Skip validation" box (not recommended).
+</Card>
+
+<Card title="Before/after snapshots" icon="camera">
+Every execution captures cluster state before and after, including health, index stats, shard distribution, and ILM policies.
+</Card>
+
+<Card title="Audit trail" icon="file-lines">
+Complete history of all executions: who applied, when, what commands were run, and the outcome.
+</Card>
+
+<Card title="Notes field" icon="note-sticky">
+Add context to each execution for future reference and compliance requirements.
+</Card>
+</CardGroup>
+
+### Adding execution notes
+
+Use the notes field to document your actions:
+
+```
+Notes: Approved by @manager in JIRA-1234.
+       Tested on staging-logs deployment first with no issues.
+       Applying to production after business hours.
+```
+
+<Tip>
+Good notes help with compliance, auditing, and troubleshooting. Future you will thank you!
+</Tip>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Always preview before applying" icon="eye">
+Review the Elasticsearch commands carefully before applying:
+
+- Are the target indices correct?
+- Is the ILM policy configuration appropriate?
+- Are data retention periods correct for your compliance requirements?
+- Does the tier migration make sense for this data?
+
+<Tip>
+Use the **Copy Commands** button to paste into Kibana Dev Tools and inspect the exact API calls before applying.
+</Tip>
+</Accordion>
+
+<Accordion title="Start with low-risk recommendations" icon="chart-line">
+Build confidence in the auto-apply feature by starting with safe changes:
+
+1. Start with `low` risk recommendations (e.g., adding ILM policies to new indices)
+2. Verify savings after 7 days
+3. Once comfortable, tackle `medium` risk recommendations
+4. Only apply `high` risk recommendations after thorough testing
+
+This approach helps you learn how Shardly works without impacting critical systems.
+</Accordion>
+
+<Accordion title="Test in non-production first" icon="flask">
+For high-risk or high-impact changes:
+
+1. Apply to a staging or development deployment first
+2. Monitor for 24-48 hours
+3. Verify no unexpected behavior
+4. Then apply to production with confidence
+
+<Warning>
+Always test recommendations that affect business-critical indices in non-production environments first.
+</Warning>
+</Accordion>
+
+<Accordion title="Have a rollback plan" icon="rotate-left">
+Before clicking **Apply Now**, ensure you can rollback if needed:
+
+- Confirm the recommendation type supports rollback
+- Have Kibana Dev Tools access ready
+- Know who to contact if manual intervention is needed
+- Schedule changes during maintenance windows for critical systems
+
+<Info>
+Shardly's one-click rollback works for most changes, but having manual access provides an extra safety net.
+</Info>
+</Accordion>
+
+<Accordion title="Document everything" icon="pen-to-square">
+Use the notes field to document each execution:
+
+- **Why**: Why are you applying this recommendation?
+- **Who**: Who approved it? Reference the ticket/issue number
+- **When**: Is this part of a planned maintenance window?
+- **Testing**: Was it tested in staging first?
+
+Example:
+```
+JIRA-1234: Reduce costs on logs indices
+Approved by: @platform-lead
+Tested on: staging-logs (2024-08-10)
+Expected savings: $780/month
+```
+
+This documentation helps with:
+- Compliance and auditing
+- Troubleshooting if issues arise
+- Knowledge transfer to team members
+</Accordion>
+
+<Accordion title="Monitor after applying" icon="chart-simple">
+After successfully applying a recommendation:
+
+1. Check cluster health immediately after execution
+2. Monitor application performance for 24 hours
+3. Watch for any error rate increases
+4. Review the 7-day savings verification when complete
+
+<Check>
+Set up Slack/email notifications for cluster health changes after applying recommendations.
+</Check>
+</Accordion>
+</AccordionGroup>
+
+## Programmatic access via API
+
+Automate recommendation execution using Shardly's REST API:
+
+<CodeGroup>
+```bash cURL
+# 1. Validate recommendation (dry-run)
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-123/validate" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 2. Preview changes
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-123/preview" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 3. Apply recommendation
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-123/apply" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"notes": "Automated apply from CI/CD pipeline", "skip_validation": false}'
+
+# 4. Check execution status
+curl -X GET "https://api.shardly.io/api/v1/recommendations/execution/exec-456/status" \
+  -H "Authorization: Bearer $TOKEN"
+
+# 5. Rollback if needed
+curl -X POST "https://api.shardly.io/api/v1/recommendations/execution/exec-456/rollback" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```python Python
+import requests
+
+BASE_URL = "https://api.shardly.io/api/v1"
+HEADERS = {"Authorization": f"Bearer {api_token}"}
+
+# Validate recommendation
+validate_response = requests.post(
+    f"{BASE_URL}/recommendations/rec-123/validate",
+    headers=HEADERS
+)
+print(f"Validation: {validate_response.json()}")
+
+# Apply if validation passed
+if validate_response.json()["is_valid"]:
+    apply_response = requests.post(
+        f"{BASE_URL}/recommendations/rec-123/apply",
+        headers=HEADERS,
+        json={
+            "notes": "Automated apply from Python script",
+            "skip_validation": False
+        }
+    )
+    execution_id = apply_response.json()["execution_id"]
+    print(f"Execution started: {execution_id}")
+    
+    # Poll for completion
+    status_response = requests.get(
+        f"{BASE_URL}/recommendations/execution/{execution_id}/status",
+        headers=HEADERS
+    )
+    print(f"Status: {status_response.json()}")
+```
+
+```javascript JavaScript
+const BASE_URL = 'https://api.shardly.io/api/v1';
+const headers = {
+  'Authorization': `Bearer ${apiToken}`,
+  'Content-Type': 'application/json'
+};
+
+// Validate recommendation
+const validateResponse = await fetch(
+  `${BASE_URL}/recommendations/rec-123/validate`,
+  { method: 'POST', headers }
+);
+const validation = await validateResponse.json();
+console.log('Validation:', validation);
+
+// Apply if valid
+if (validation.is_valid) {
+  const applyResponse = await fetch(
+    `${BASE_URL}/recommendations/rec-123/apply`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        notes: 'Automated apply from Node.js',
+        skip_validation: false
+      })
+    }
+  );
+  const result = await applyResponse.json();
+  console.log('Execution started:', result.execution_id);
+  
+  // Check status
+  const statusResponse = await fetch(
+    `${BASE_URL}/recommendations/execution/${result.execution_id}/status`,
+    { headers }
+  );
+  const status = await statusResponse.json();
+  console.log('Status:', status);
+}
+```
+</CodeGroup>
+
+<Info>
+See the full [API Reference](/api-reference/recommendations/apply) for detailed documentation on all endpoints, parameters, and response formats.
+</Info>
+
+## Comparison: Shardly vs Elastic AutoOps
+
+Shardly's auto-apply feature is unique in the Elasticsearch ecosystem:
+
+| Capability | Elastic AutoOps | Shardly |
+|------------|-----------------|---------|
+| Detects optimization opportunities | ✅ | ✅ |
+| Suggests fixes with ES commands | ✅ | ✅ |
+| Shows estimated savings | ✅ | ✅ |
+| **Pre-flight validation** | ❌ | ✅ |
+| **One-click apply** | ❌ | ✅ |
+| **Real-time progress tracking** | ❌ | ✅ |
+| **Before/after snapshots** | ❌ | ✅ |
+| **Automatic rollback** | ❌ | ✅ |
+| **Savings verification** | ❌ | ✅ |
+| **Programmatic API access** | ❌ | ✅ |
+
+<Warning>
+**Elastic AutoOps has no public API.** This makes Shardly the **only tool** that can programmatically apply Elasticsearch optimizations.
+</Warning>
+
+### Why this matters
+
+**With Elastic AutoOps**, you must:
+1. View recommendations in the console
+2. Manually copy commands
+3. Open Kibana Dev Tools
+4. Paste and execute each command
+5. Hope you didn't make a mistake
+6. Repeat for every recommendation, on every deployment
+
+**With Shardly**, you:
+1. Review the recommendation
+2. Click **Apply Now**
+3. Done ✓
+
+This saves hours of manual work for teams managing multiple Elasticsearch deployments.
+

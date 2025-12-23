@@ -1,0 +1,241 @@
+---
+title: Introduction
+description: "Welcome to Shardly - The FinOps Platform for Elasticsearch"
+---
+
+<Frame>
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.svg"
+  alt="Shardly dashboard showing cost analysis, optimization recommendations, and savings tracking for Elasticsearch deployments"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.svg"
+  alt="Shardly dashboard showing cost analysis, optimization recommendations, and savings tracking for Elasticsearch deployments"
+/>
+</Frame>
+
+## What is Shardly?
+
+Shardly is a comprehensive **FinOps platform for Elasticsearch and Elastic Cloud** that helps you understand, optimize, and reduce your Elasticsearch costs. Unlike Elastic's native AutoOps which only provides suggestions, Shardly goes further by **automatically applying optimizations** with built-in safety checks and rollback capabilities.
+
+<Tip>
+**Key differentiator**: Shardly is the only tool that can automatically execute Elasticsearch optimizations. Elastic AutoOps and other tools only suggest changes - you still have to apply them manually.
+</Tip>
+
+<CardGroup cols={2}>
+  <Card
+    title="Cost Visibility"
+    icon="chart-pie"
+    href="/features/cost-analysis"
+  >
+    See exactly where your Elasticsearch spending goes with index-level cost attribution
+  </Card>
+  <Card
+    title="Smart Recommendations"
+    icon="lightbulb"
+    href="/features/recommendations"
+  >
+    AI-powered optimization suggestions with estimated savings
+  </Card>
+  <Card
+    title="One-Click Apply"
+    icon="play"
+    href="/features/auto-apply"
+  >
+    Automatically apply optimizations with pre-flight validation and rollback
+  </Card>
+  <Card
+    title="Savings Tracking"
+    icon="piggy-bank"
+    href="/features/savings-tracking"
+  >
+    Prove ROI with verified savings tracking and reporting
+  </Card>
+</CardGroup>
+
+## Why Shardly?
+
+### The problem you're facing
+
+If you're running Elasticsearch, you've likely experienced these challenges:
+
+<AccordionGroup>
+<Accordion title="No index-level visibility" icon="eye-slash">
+Elastic Cloud billing shows total deployment costs, but you can't see which indices are driving expenses. Is it your logs? Metrics? Application data? You're left guessing.
+</Accordion>
+
+<Accordion title="Manual optimization is time-consuming" icon="clock">
+Elastic AutoOps suggests changes, but you still have to:
+1. Open Kibana Dev Tools
+2. Copy and paste commands
+3. Manually execute each one
+4. Hope you didn't make a mistake
+
+For organizations with dozens of deployments, this becomes a full-time job.
+</Accordion>
+
+<Accordion title="Limited data retention" icon="database">
+AutoOps only retains 10 days of historical data. You can't see cost trends, track savings over time, or prove ROI to stakeholders.
+</Accordion>
+
+<Accordion title="No programmatic access" icon="code">
+Elastic AutoOps has no API. You can't automate optimization, integrate with CI/CD, or build custom workflows.
+</Accordion>
+</AccordionGroup>
+
+### How Shardly solves this
+
+Shardly addresses all these challenges:
+
+| Challenge | Elastic AutoOps | Shardly |
+|-----------|-----------------|---------|
+| Index-level costs | ❌ | ✅ |
+| Cost attribution by team | ❌ | ✅ |
+| Automatic optimization | ❌ | ✅ |
+| Data retention | 10 days | 12+ months |
+| Savings verification | Limited | ✅ |
+| API access | ❌ | ✅ |
+
+## Key Features
+
+### 📊 Cost analysis
+
+Get index-level visibility into your Elasticsearch spending:
+
+- **Real-time cost breakdowns** by index, tier, team, and project
+- **Historical trend analysis** with automatic anomaly detection
+- **Cost forecasting** based on growth patterns and usage trends
+- **Index pattern grouping** to see aggregate costs for related indices
+
+<Note>
+Shardly calculates index-level costs using a proprietary allocation model that considers storage, compute, and tier-specific pricing.
+</Note>
+
+### 💡 Intelligent recommendations
+
+Six optimization detectors continuously analyze your clusters to identify savings opportunities:
+
+1. **Shard count optimization** - Right-size shard counts based on index size and query load
+2. **Oversized shard detection** - Identify and split shards exceeding optimal size
+3. **Missing ILM policies** - Implement data lifecycle management to reduce costs
+4. **Tier optimization** - Move older data to cheaper storage tiers
+5. **Over-replication** - Reduce excess replicas where high availability isn't critical
+6. **Underutilized nodes** - Identify opportunities to downsize infrastructure
+
+Each recommendation includes:
+- Estimated monthly savings
+- Step-by-step runbook
+- Risk assessment
+- Effort estimate
+
+### ⚡ One-click auto-apply
+
+<Tip>
+**This is Shardly's killer feature**: Unlike any other tool, Shardly can automatically apply recommendations directly to your cluster.
+</Tip>
+
+The auto-apply process includes:
+
+- **Pre-flight validation** - Checks cluster health, disk space, and conflicts before execution
+- **Real-time progress tracking** - Watch each step execute with live status updates
+- **Before/after snapshots** - Captures cluster state for verification and rollback
+- **One-click rollback** - Revert changes if something goes wrong
+- **Audit trail** - Complete history of who applied what and when
+
+### 🤖 AI Copilot
+
+Ask questions about your costs and optimizations in natural language:
+
+- *"Why did my costs increase this month?"*
+- *"How can I save money on my logs indices?"*
+- *"Explain this ILM recommendation"*
+- *"What's the risk of reducing replicas on prod-metrics-2024?"*
+
+The AI Copilot is powered by Claude Sonnet 4 and has full context about your deployments, costs, and recommendations.
+
+## Architecture overview
+
+Shardly is built with modern, scalable technologies:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Frontend                              │
+│  Next.js 14 • React • Tailwind • shadcn/ui • Recharts       │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Backend API                             │
+│  FastAPI • SQLAlchemy • Celery • Redis                      │
+└─────────────────────────────────────────────────────────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼               ▼               ▼
+        ┌──────────┐   ┌──────────┐   ┌──────────────┐
+        │PostgreSQL│   │  Redis   │   │Elastic Cloud │
+        │TimescaleDB   │  Queue   │   │     API      │
+        └──────────┘   └──────────┘   └──────────────┘
+```
+
+<AccordionGroup>
+<Accordion title="Frontend stack" icon="browser">
+- **Next.js 14** with App Router for modern React development
+- **Tailwind CSS** and **shadcn/ui** for beautiful, accessible components
+- **Recharts** for interactive cost visualization
+- **TanStack Table** for high-performance data tables
+- **React Query** for efficient data fetching and caching
+</Accordion>
+
+<Accordion title="Backend stack" icon="server">
+- **FastAPI** for high-performance async API endpoints
+- **SQLAlchemy** with async support for database access
+- **Celery** for background job processing (data collection, analysis)
+- **Redis** for task queue and caching
+- **PostgreSQL** with **TimescaleDB** for time-series cost data
+</Accordion>
+
+<Accordion title="Security" icon="shield">
+- **Clerk** for enterprise-grade authentication
+- **Fernet encryption** for API key storage
+- **JWT tokens** for API authorization
+- **Role-based access control** for team management
+</Accordion>
+</AccordionGroup>
+
+## Getting started
+
+Ready to optimize your Elasticsearch costs?
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get Shardly running locally with Docker in under 5 minutes
+  </Card>
+  <Card
+    title="Core concepts"
+    icon="book"
+    href="/concepts"
+  >
+    Understand Shardly's key concepts and terminology
+  </Card>
+  <Card
+    title="Elastic Cloud integration"
+    icon="plug"
+    href="/integrations/elastic-cloud"
+  >
+    Connect your Elastic Cloud organization to Shardly
+  </Card>
+  <Card
+    title="Production deployment"
+    icon="server"
+    href="/deployment/production"
+  >
+    Deploy Shardly to production with Kubernetes
+  </Card>
+</CardGroup>
+

@@ -1,0 +1,229 @@
+---
+title: Environment Variables
+description: "Configure Shardly using environment variables"
+---
+
+## Overview
+
+Shardly is configured primarily through environment variables. This page documents all available options.
+
+## Required Variables
+
+These variables must be set for Shardly to function:
+
+### Database
+
+<ParamField body="DATABASE_URL" type="string" required>
+  PostgreSQL connection string with TimescaleDB extension.
+  
+  ```
+  postgresql://user:password@host:5432/shardly
+  ```
+</ParamField>
+
+### Redis
+
+<ParamField body="REDIS_URL" type="string" required>
+  Redis connection string for task queue and caching.
+  
+  ```
+  redis://host:6379/0
+  ```
+</ParamField>
+
+### Security
+
+<ParamField body="ENCRYPTION_KEY" type="string" required>
+  Fernet encryption key for encrypting sensitive data (API keys).
+  
+  Generate with:
+  ```bash
+  openssl rand -base64 32
+  ```
+  
+  <Warning>
+    Store this key securely. If lost, you cannot decrypt stored API keys.
+  </Warning>
+</ParamField>
+
+### Clerk Authentication
+
+<ParamField body="CLERK_SECRET_KEY" type="string" required>
+  Clerk backend secret key for JWT verification.
+  
+  Get from [clerk.com](https://clerk.com) dashboard.
+</ParamField>
+
+<ParamField body="CLERK_WEBHOOK_SECRET" type="string" required>
+  Secret for verifying Clerk webhook signatures.
+</ParamField>
+
+## Optional Variables
+
+### Application
+
+<ParamField body="APP_NAME" type="string" default="Shardly">
+  Application name displayed in UI and emails.
+</ParamField>
+
+<ParamField body="DEBUG" type="boolean" default="false">
+  Enable debug mode. **Never enable in production.**
+</ParamField>
+
+### AI Copilot
+
+<ParamField body="ANTHROPIC_API_KEY" type="string">
+  Anthropic API key for Claude AI integration.
+  
+  Required for the AI Copilot feature to work.
+  
+  Get from [console.anthropic.com](https://console.anthropic.com)
+</ParamField>
+
+### Elastic Cloud
+
+<ParamField body="ELASTIC_CLOUD_API_BASE" type="string" default="https://api.elastic-cloud.com/api/v1">
+  Base URL for Elastic Cloud API.
+  
+  Only change if using a different Elastic Cloud region or private deployment.
+</ParamField>
+
+### CORS
+
+<ParamField body="CORS_ORIGINS" type="string[]" default='["http://localhost:3000"]'>
+  Allowed origins for CORS requests.
+  
+  ```
+  CORS_ORIGINS=["https://app.shardly.io","https://staging.shardly.io"]
+  ```
+</ParamField>
+
+### Frontend
+
+<ParamField body="NEXT_PUBLIC_API_URL" type="string" default="http://localhost:8000">
+  Backend API URL for frontend to connect to.
+  
+  ```
+  NEXT_PUBLIC_API_URL=https://api.shardly.io
+  ```
+</ParamField>
+
+<ParamField body="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" type="string" required>
+  Clerk publishable key for frontend authentication.
+</ParamField>
+
+## Example Configuration
+
+### Development
+
+```bash .env
+# Database
+DATABASE_URL=postgresql://shardly:shardly@localhost:5432/shardly
+
+# Redis
+REDIS_URL=redis://localhost:6379/0
+
+# Security
+ENCRYPTION_KEY=your-32-byte-base64-encoded-key-here
+
+# Clerk (get from clerk.com)
+CLERK_SECRET_KEY=sk_test_xxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxx
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxx
+
+# Anthropic (optional, for AI Copilot)
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+
+# Development settings
+DEBUG=true
+CORS_ORIGINS=["http://localhost:3000"]
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+### Production
+
+```bash .env
+# Database (use connection pooler for production)
+DATABASE_URL=postgresql://shardly:secure-password@db.example.com:5432/shardly?sslmode=require
+
+# Redis (use managed Redis with TLS)
+REDIS_URL=rediss://user:password@redis.example.com:6379/0
+
+# Security (generate a unique key!)
+ENCRYPTION_KEY=secure-production-key-here
+
+# Clerk (use production keys)
+CLERK_SECRET_KEY=sk_live_xxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxx
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxx
+
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+
+# Production settings
+DEBUG=false
+CORS_ORIGINS=["https://app.shardly.io"]
+NEXT_PUBLIC_API_URL=https://api.shardly.io
+```
+
+## Docker Compose
+
+Use an `.env` file with Docker Compose:
+
+```yaml docker-compose.yml
+services:
+  backend:
+    image: shardly/backend
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://shardly:shardly@postgres:5432/shardly
+      - REDIS_URL=redis://redis:6379/0
+```
+
+## Kubernetes
+
+Use ConfigMaps for non-sensitive values and Secrets for sensitive ones:
+
+```yaml configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shardly-config
+data:
+  APP_NAME: "Shardly"
+  ELASTIC_CLOUD_API_BASE: "https://api.elastic-cloud.com/api/v1"
+  CORS_ORIGINS: '["https://app.shardly.io"]'
+```
+
+```yaml secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shardly-secrets
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://..."
+  REDIS_URL: "redis://..."
+  ENCRYPTION_KEY: "..."
+  CLERK_SECRET_KEY: "..."
+  ANTHROPIC_API_KEY: "..."
+```
+
+## Validation
+
+Shardly validates environment variables on startup. Missing required variables will cause the application to fail with a clear error message:
+
+```
+ERROR: Required environment variable 'DATABASE_URL' is not set
+ERROR: Required environment variable 'ENCRYPTION_KEY' is not set
+```
+
+## Security Notes
+
+1. **Never commit `.env` files** to version control
+2. **Use different keys** for development, staging, and production
+3. **Rotate encryption keys** periodically (requires re-encrypting stored data)
+4. **Use secrets management** (AWS Secrets Manager, HashiCorp Vault) for production
+5. **Limit access** to environment files on servers
+

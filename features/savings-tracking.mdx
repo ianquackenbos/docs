@@ -1,0 +1,343 @@
+---
+title: Savings Tracking
+description: "Prove ROI with verified savings and reporting"
+---
+
+## Overview
+
+Shardly doesn't just suggest optimizations—it **proves they worked**. The savings tracking feature monitors costs after implementation to verify actual savings and provide ROI proof for stakeholders.
+
+<Tip>
+**Prove value to leadership:** Automatic savings verification gives you hard numbers to show executives and finance teams - not estimates, but verified results.
+</Tip>
+
+## How savings tracking works
+
+<Steps>
+<Step title="Day 0: Capture baseline">
+When you apply a recommendation, Shardly captures:
+- Current deployment costs
+- Affected indices costs
+- Storage sizes and shard counts
+- Tier distribution
+
+This baseline becomes the "before" snapshot for comparison.
+</Step>
+
+<Step title="Days 1-7: Monitor costs">
+Shardly tracks costs daily during the measurement period:
+- Collects cost data hourly
+- Accounts for normal day-to-day variation
+- Monitors for any regression or issues
+- Tracks affected indices specifically
+
+<Info>
+The 7-day window accounts for weekday/weekend usage patterns and ensures accurate measurements.
+</Info>
+</Step>
+
+<Step title="Day 7: Calculate savings">
+After 7 days, Shardly calculates actual savings:
+
+```
+Baseline Cost  = Average daily cost (days -3 to 0)
+Current Cost   = Average daily cost (days 4 to 7)
+Daily Savings  = Baseline - Current
+Monthly Savings = Daily Savings × 30
+```
+
+<Check>
+Savings are now verified and displayed in your dashboard
+</Check>
+</Step>
+
+<Step title="Ongoing: Continued monitoring">
+Shardly continues tracking for 30 days to:
+- Detect cost regression
+- Ensure savings persist
+- Update confidence scores
+- Alert on unexpected changes
+</Step>
+</Steps>
+
+## Verified savings metrics
+
+### What gets tracked
+
+Every tracked change records comprehensive before/after metrics:
+
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| **Daily cost** | $418.67 | $392.34 | -$26.33 (-6.3%) |
+| **Monthly cost** (projected) | $12,500 | $11,720 | **-$780** |
+| **Affected index size** | 2.1 TB | 2.1 TB | 0% |
+| **Shard count** | 150 | 150 | unchanged |
+| **Tier distribution** | 100% hot | 70% hot, 30% warm | optimized |
+
+<Frame>
+<img src="/images/savings-verification.png" alt="Savings verification dashboard showing before/after comparison with verified monthly savings of $780" />
+</Frame>
+
+### Confidence score
+
+Shardly assigns a confidence score (0-100%) to indicate measurement reliability:
+
+<CardGroup cols={4}>
+<Card title="90-100%" icon="check-double">
+**Excellent**
+
+High confidence, stable data, reliable savings
+</Card>
+
+<Card title="70-89%" icon="check">
+**Good**
+
+Good confidence, some variation, trustworthy
+</Card>
+
+<Card title="50-69%" icon="circle-half-stroke">
+**Moderate**
+
+Moderate confidence, noisy data, needs review
+</Card>
+
+<Card title="<50%" icon="circle-xmark">
+**Low**
+
+Low confidence, unstable, extend measurement
+</Card>
+</CardGroup>
+
+#### Factors affecting confidence
+
+<AccordionGroup>
+<Accordion title="Data stability" icon="wave-square">
+Lower cost variation = higher confidence. If costs fluctuate wildly day-to-day, confidence decreases.
+</Accordion>
+
+<Accordion title="Measurement period" icon="calendar">
+Longer measurement periods increase confidence. 7 days is minimum; 30 days is optimal.
+</Accordion>
+
+<Accordion title="External factors" icon="cloud">
+Traffic spikes, data growth, or other changes during measurement reduce confidence.
+</Accordion>
+
+<Accordion title="Implementation quality" icon="wrench">
+Clean implementations without issues or rollbacks have higher confidence.
+</Accordion>
+</AccordionGroup>
+
+### Savings vs estimate comparison
+
+Compare actual savings to the original recommendation estimate:
+
+```
+💰 Savings Verification Results
+
+Estimated Monthly Savings: $780
+Actual Monthly Savings:    $823
+Variance:                  +5.5% ✓
+
+Status: Exceeded Estimate
+Confidence: 94% (Excellent)
+```
+
+<Tip>
+**Most savings exceed estimates!** Shardly's conservative estimation methodology means actual savings typically beat projections by 5-10%.
+</Tip>
+
+## Savings dashboard
+
+### Annual savings summary
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   SAVINGS SUMMARY (2024)                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Total Verified Savings                                      │
+│  ┌─────────────────────────────────┐                        │
+│  │         $47,280                 │                        │
+│  │         ━━━━━━━                 │                        │
+│  │    from 23 optimizations        │                        │
+│  └─────────────────────────────────┘                        │
+│                                                              │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐            │
+│  │ This Month │  │ vs Estimate│  │ Avg ROI    │            │
+│  │   $4,320   │  │   +8.2%    │  │    312%    │            │
+│  └────────────┘  └────────────┘  └────────────┘            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Savings by category
+
+See which optimization types deliver the best results:
+
+| Optimization Type | Count | Total Savings | Avg per Rec | Success Rate |
+|-------------------|-------|---------------|-------------|--------------|
+| **ILM Policies** | 8 | $18,240 | $2,280 | 100% |
+| **Tier Migration** | 6 | $12,480 | $2,080 | 100% |
+| **Replica Reduction** | 5 | $8,900 | $1,780 | 100% |
+| **Shard Optimization** | 3 | $5,460 | $1,820 | 100% |
+| **Node Downsizing** | 1 | $2,200 | $2,200 | 100% |
+
+<Info>
+**ILM policies consistently deliver the highest savings** because they automate tier migration and data lifecycle management.
+</Info>
+
+### Savings timeline
+
+Interactive chart showing cumulative savings over time:
+
+<Frame>
+<img src="/images/savings-timeline.png" alt="Cumulative savings chart showing steady growth from $0 to $47,280 over 12 months with each optimization marked" />
+</Frame>
+
+## ROI reporting
+
+Generate ROI reports for stakeholders:
+
+### Executive summary report
+
+Perfect for board presentations or finance reviews:
+
+```markdown
+## Elasticsearch Optimization ROI Report
+**Period:** January - August 2024
+
+### Key Metrics
+- **Total Annual Savings:** $47,280
+- **Implementation Cost:** $0 (auto-apply)
+- **Time Invested:** ~12 hours (review & approval)
+- **ROI:** Infinite (no implementation cost)
+
+### Top 3 Wins
+1. Implement ILM on logs-prod-* → $2,280/month
+2. Migrate audit-* to warm tier → $2,080/month
+3. Reduce replicas on archive-* → $1,780/month
+
+### Recommendations
+Continue current optimization cadence. Projected annual savings: $71,000.
+```
+
+### Detailed tracking report
+
+For technical teams and auditors:
+
+<Tabs>
+<Tab title="By recommendation">
+Lists each recommendation with:
+- Implementation date and user
+- Before/after metrics
+- Verification status
+- Confidence score
+</Tab>
+
+<Tab title="By deployment">
+Groups savings by deployment for showback/chargeback to teams.
+</Tab>
+
+<Tab title="By time period">
+Monthly or quarterly rollups for budget tracking and forecasting.
+</Tab>
+</Tabs>
+
+## Regression detection
+
+Shardly monitors for cost regression after implementation:
+
+### What triggers alerts
+
+<CardGroup cols={3}>
+<Card title="Cost increase" icon="arrow-trend-up">
+Costs return to or exceed baseline after savings period
+</Card>
+
+<Card title="Configuration drift" icon="gears">
+Changes made that reverse the optimization
+</Card>
+
+<Card title="Data growth" icon="database">
+New data negates the optimization's impact
+</Card>
+</CardGroup>
+
+### Regression notification
+
+```
+⚠️ Savings Regression Detected
+
+Recommendation #47: ILM Policy for logs-prod-*
+Implemented: 2024-07-01
+Verified Savings: $780/month (confidence: 94%)
+
+Issue: Costs increased by $420 in past week
+Cause: New indices created without ILM policy
+
+Action Required: Apply ILM to new indices:
+  - logs-prod-2024.08.10
+  - logs-prod-2024.08.11
+  - logs-prod-2024.08.12
+```
+
+<Tip>
+Enable Slack or email notifications for regression alerts to address issues immediately.
+</Tip>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Wait for verification" icon="hourglass">
+Don't implement multiple optimizations simultaneously. Wait 7 days between implementations for accurate savings attribution.
+</Accordion>
+
+<Accordion title="Share wins with stakeholders" icon="bullhorn">
+Use the ROI report generator monthly to showcase value to leadership and finance teams.
+</Accordion>
+
+<Accordion title="Track by team" icon="users">
+Use cost attribution to show each team their optimization impact and build optimization culture.
+</Accordion>
+
+<Accordion title="Monitor for regression" icon="bell">
+Set up alerts for savings regression so you can address issues before they negate your optimizations.
+</Accordion>
+
+<Accordion title="Use confidence scores" icon="gauge-high">
+Only report savings with >70% confidence to stakeholders. Lower confidence needs more data.
+</Accordion>
+</AccordionGroup>
+
+## API access
+
+Access savings data programmatically:
+
+<CodeGroup>
+```bash cURL
+# Get all verified savings
+curl -X GET "https://api.shardly.io/api/v1/savings" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get savings for specific recommendation
+curl -X GET "https://api.shardly.io/api/v1/recommendations/rec-123/savings" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://api.shardly.io/api/v1/savings",
+    headers={"Authorization": f"Bearer {api_token}"}
+)
+
+savings_data = response.json()
+total_savings = sum(s["actual_monthly_savings"] for s in savings_data)
+print(f"Total verified savings: ${total_savings:,.0f}/month")
+```
+</CodeGroup>
+
+<Info>
+See the [API Reference](/api-reference/introduction) for complete documentation on savings endpoints.
+</Info>

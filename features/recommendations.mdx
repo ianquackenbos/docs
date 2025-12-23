@@ -1,0 +1,289 @@
+---
+title: Recommendations
+description: "AI-powered optimization suggestions to reduce Elasticsearch costs"
+---
+
+## Overview
+
+Shardly's recommendation engine continuously analyzes your Elasticsearch deployments to identify optimization opportunities. Each recommendation includes estimated savings, implementation effort, risk assessment, and step-by-step runbooks for easy implementation.
+
+<Frame>
+  <img src="/images/recommendations-list.png" alt="Recommendations dashboard showing list of optimization opportunities sorted by potential monthly savings" />
+</Frame>
+
+<Tip>
+Unlike Elastic AutoOps which only retains 10 days of data, Shardly tracks recommendation history for 12+ months, giving you long-term visibility into optimization patterns.
+</Tip>
+
+## How It Works
+
+### Detection Engine
+
+Shardly runs six specialized detectors that analyze different aspects of your clusters:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Recommendation Engine                     │
+├─────────────────────────────────────────────────────────────┤
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │
+│  │ Shard Count   │  │  Oversized    │  │  Missing ILM  │   │
+│  │   Detector    │  │   Shards      │  │    Detector   │   │
+│  └───────────────┘  └───────────────┘  └───────────────┘   │
+│  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐   │
+│  │    Tier       │  │    Over-      │  │ Underutilized │   │
+│  │ Optimization  │  │  Replication  │  │    Nodes      │   │
+│  └───────────────┘  └───────────────┘  └───────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    Prioritized Recommendations
+                    (sorted by potential savings)
+```
+
+### Analysis schedule
+
+| Activity | Frequency | Details |
+|----------|-----------|---------|
+| **Metrics collection** | Every hour | Collects cluster data from Elasticsearch API |
+| **Cost calculation** | Every 6 hours | Updates index-level cost allocations |
+| **Recommendation analysis** | Daily at 2 AM UTC | Runs all detectors and generates recommendations |
+| **Manual trigger** | On-demand | Click **Analyze Now** on any deployment |
+
+<Info>
+You can adjust the analysis schedule in **Settings** → **Collectors** to match your change management windows.
+</Info>
+
+## Recommendation Types
+
+### 1. ILM Optimization
+
+**What it detects**: Indices without lifecycle management policies
+
+**Why it matters**: Without ILM, data stays on expensive hot tier indefinitely
+
+**Typical savings**: 20-60%
+
+```json
+{
+  "type": "ilm_optimization",
+  "title": "Add ILM policy to logs-prod-* indices",
+  "description": "23 indices totaling 2.1TB have no ILM policy configured...",
+  "estimated_monthly_savings": 780,
+  "affected_indices": ["logs-prod-2024.01.*", "logs-prod-2024.02.*", ...]
+}
+```
+
+### 2. Tier Migration
+
+**What it detects**: Old data sitting on expensive tiers
+
+**Why it matters**: Warm tier is 50% cheaper, cold is 75% cheaper
+
+**Typical savings**: 30-70%
+
+```json
+{
+  "type": "tier_migration",
+  "title": "Move data older than 30d from hot to warm tier",
+  "description": "450GB of data older than 30 days is still on hot tier...",
+  "estimated_monthly_savings": 520,
+  "affected_indices": ["metrics-2024.01.*", "metrics-2024.02.*"]
+}
+```
+
+### 3. Shard Count Reduction
+
+**What it detects**: Over-sharded indices (too many small shards)
+
+**Why it matters**: Each shard has memory/CPU overhead
+
+**Typical savings**: 10-30%
+
+```json
+{
+  "type": "shard_reduction",
+  "title": "Reduce shard count on small indices",
+  "description": "15 indices have < 1GB per shard, causing overhead...",
+  "estimated_monthly_savings": 340,
+  "affected_indices": ["logs-debug-*", "events-low-*"]
+}
+```
+
+### 4. Shard Size Optimization
+
+**What it detects**: Oversized shards (>50GB per shard)
+
+**Why it matters**: Large shards are slow to search and recover
+
+**Typical savings**: 10-25% (performance improvement)
+
+```json
+{
+  "type": "shard_size_optimization",
+  "title": "Split oversized shards in metrics-prod",
+  "description": "3 shards exceed 50GB, impacting search performance...",
+  "estimated_monthly_savings": 0,
+  "performance_impact": "high"
+}
+```
+
+### 5. Replica Reduction
+
+**What it detects**: Indices with more replicas than needed
+
+**Why it matters**: Each replica doubles storage costs
+
+**Typical savings**: 10-50%
+
+```json
+{
+  "type": "replica_reduction",
+  "title": "Reduce replicas on low-priority indices",
+  "description": "Archive indices have 2 replicas, 1 is sufficient...",
+  "estimated_monthly_savings": 420,
+  "affected_indices": ["archive-*"]
+}
+```
+
+### 6. Node Downsizing
+
+**What it detects**: Underutilized nodes
+
+**Why it matters**: You're paying for capacity you don't use
+
+**Typical savings**: 15-40%
+
+```json
+{
+  "type": "node_downsizing",
+  "title": "Downsize underutilized warm tier nodes",
+  "description": "Warm tier nodes average 35% CPU, 40% disk utilization...",
+  "estimated_monthly_savings": 850
+}
+```
+
+## Recommendation Detail
+
+Click any recommendation to see detailed information:
+
+### Impact Analysis
+
+| Metric | Value |
+|--------|-------|
+| Severity | High |
+| Risk Level | Low |
+| Effort | Medium |
+| Affected Indices | 23 |
+| Affected Storage | 2.1 TB |
+| Monthly Savings | $780 |
+
+### Implementation Runbook
+
+Step-by-step instructions with exact Elasticsearch commands:
+
+<Steps>
+  <Step title="Review Current State">
+    Check current ILM status:
+    ```bash
+    GET /logs-prod-*/_ilm/explain
+    ```
+  </Step>
+  <Step title="Create ILM Policy">
+    Create the optimized policy:
+    ```bash
+    PUT /_ilm/policy/shardly-optimized-policy
+    {
+      "policy": {
+        "phases": {
+          "hot": { ... },
+          "warm": { "min_age": "7d", ... },
+          "delete": { "min_age": "90d", ... }
+        }
+      }
+    }
+    ```
+  </Step>
+  <Step title="Update Index Template">
+    Apply policy to index template
+  </Step>
+  <Step title="Apply to Existing Indices">
+    Apply policy to existing indices
+  </Step>
+  <Step title="Verify">
+    Confirm ILM is active
+  </Step>
+</Steps>
+
+### Rollback Procedure
+
+If something goes wrong:
+
+1. Remove ILM policy from indices
+2. Delete the created policy
+3. Restore original template settings
+
+## Managing Recommendations
+
+### Status Options
+
+| Status | Description | Action |
+|--------|-------------|--------|
+| Pending | Awaiting action | Apply, Dismiss, or Snooze |
+| Implemented | Applied successfully | View savings |
+| Dismissed | Not applicable | (Hidden from list) |
+| Snoozed | Temporarily hidden | (Reappears after period) |
+
+### Bulk Actions
+
+Select multiple recommendations to:
+- Dismiss all
+- Snooze for 7/30/90 days
+- Export to CSV
+
+## Best Practices
+
+### 1. Start with High-Impact, Low-Risk
+
+Focus on recommendations that are:
+- High severity (big savings)
+- Low risk (safe to implement)
+- Low effort (quick wins)
+
+### 2. Review Weekly
+
+Set a recurring task to:
+- Check new recommendations
+- Verify implemented optimizations
+- Dismiss non-applicable suggestions
+
+### 3. Test in Non-Production First
+
+For high-risk changes:
+- Test on staging cluster
+- Validate rollback procedure
+- Monitor for 24-48 hours
+
+### 4. Track Results
+
+After implementing:
+- Verify savings in 7 days
+- Document lessons learned
+- Share wins with team
+
+## API Access
+
+```bash
+# List recommendations
+curl -X GET "https://api.shardly.io/v1/recommendations?deployment_id={id}" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get recommendation detail
+curl -X GET "https://api.shardly.io/v1/recommendations/{rec_id}" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Trigger analysis
+curl -X POST "https://api.shardly.io/v1/recommendations/analyze" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"deployment_id": "..."}'
+```
+

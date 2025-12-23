@@ -1,0 +1,272 @@
+---
+title: Cost Analysis
+description: "Understand your Elasticsearch costs with index-level visibility"
+---
+
+## Overview
+
+Shardly's cost analysis goes beyond what Elastic Cloud provides. While Elastic shows you total deployment costs, Shardly breaks these down to the **index level**, giving you visibility into exactly where your money is going.
+
+<Frame>
+  <img src="/images/cost-dashboard.png" alt="Cost analysis dashboard showing monthly spend, trends, and breakdown by tier and index" />
+</Frame>
+
+<Tip>
+**Key differentiator:** Elastic Cloud only shows deployment-level costs. Shardly shows you which *specific indices* are expensive so you know exactly where to optimize.
+</Tip>
+
+## Cost dashboard
+
+The main dashboard provides an at-a-glance view of your Elasticsearch spending:
+
+### Summary metrics
+
+<CardGroup cols={4}>
+<Card title="Total monthly spend" icon="dollar-sign">
+Current month's projected costs based on daily usage
+</Card>
+
+<Card title="Month-over-month" icon="chart-line">
+Percentage change from last month with trend direction
+</Card>
+
+<Card title="Potential savings" icon="piggy-bank">
+Sum of all pending recommendation estimated savings
+</Card>
+
+<Card title="Active recommendations" icon="lightbulb">
+Number of optimization opportunities available
+</Card>
+</CardGroup>
+
+### Cost trend chart
+
+Visualize your spending over time with interactive charts:
+
+- **Default 30-day view** with daily granularity
+- **Toggle timeframes**: 7 days, 30 days, 90 days, 12 months
+- **Cost breakdown**: Capacity, storage, data transfer
+- **Anomaly detection**: Automatic highlighting of unusual spikes
+- **Hover details**: See exact costs for any day
+
+<Frame>
+<img src="/images/cost-trend-chart.png" alt="Interactive cost trend chart showing 30 days of spending with capacity, storage, and transfer breakdowns" />
+</Frame>
+
+### Cost by storage tier
+
+Pie chart visualization of spending distribution across Elasticsearch tiers:
+
+| Tier | Cost Factor | Best For |
+|------|-------------|----------|
+| **Hot** | 1.0x (most expensive) | Active data, frequent queries, real-time |
+| **Warm** | 0.5x (50% cheaper) | Recent data, less frequent access |
+| **Cold** | 0.25x (75% cheaper) | Infrequent access, compressed storage |
+| **Frozen** | 0.1x (90% cheaper) | Archive, searchable snapshots only |
+
+<Tip>
+Moving 1TB from hot to warm tier saves ~$50/month. Hot to cold saves ~$75/month!
+</Tip>
+
+## Index-level cost breakdown
+
+Drill down to see costs for individual indices - the level of detail Elastic Cloud doesn't provide:
+
+### Index cost table
+
+```
+Index Pattern      | Size    | Tier | Monthly Cost | Trend
+───────────────────────────────────────────────────────────────
+logs-prod-*        | 2.5 TB  | Hot  | $3,200       | ↑ +12.5%
+metrics-*          | 1.8 TB  | Hot  | $2,400       | ↓ -5.2%
+traces-*           | 950 GB  | Warm | $850         | ↑ +8.1%
+audit-logs-*       | 750 GB  | Warm | $680         | ↑ +2.3%
+security-*         | 500 GB  | Hot  | $650         | ↓ -1.5%
+```
+
+### Powerful filtering and sorting
+
+<AccordionGroup>
+<Accordion title="Filter by tier" icon="filter">
+Focus on hot, warm, cold, or frozen tier indices to identify tier optimization opportunities.
+</Accordion>
+
+<Accordion title="Filter by team" icon="users">
+Show only indices attributed to specific teams based on your attribution rules.
+</Accordion>
+
+<Accordion title="Search by pattern" icon="magnifying-glass">
+Find specific indices by name pattern (e.g., `logs-prod-*` or `metrics-api-*`).
+</Accordion>
+
+<Accordion title="Filter by cost threshold" icon="dollar-sign">
+Show only indices above or below specific cost thresholds (e.g., >$100/month).
+</Accordion>
+</AccordionGroup>
+
+**Sort options:**
+- **Cost** (highest first) - Find your most expensive indices
+- **Size** (largest first) - Identify storage-heavy indices
+- **Growth rate** (fastest growing) - Catch cost increases early
+- **Shard count** - Find over-sharded indices
+
+## Cost attribution by team
+
+See costs broken down by team or project using attribution rules:
+
+### Setting up attribution rules
+
+<Steps>
+<Step title="Navigate to cost rules">
+Go to **Settings** → **Cost Rules** in the sidebar.
+</Step>
+
+<Step title="Create attribution rule">
+Click **Add Rule** and configure:
+
+- **Pattern**: Index name pattern (e.g., `logs-frontend-*`)
+- **Pattern Type**: Prefix, suffix, regex, or exact match
+- **Team**: Team name (e.g., "Frontend Engineering")
+- **Project**: Optional project name (e.g., "Web Application")
+- **Priority**: Lower numbers evaluated first
+
+<Info>
+Rules are evaluated in priority order. The first matching rule wins.
+</Info>
+</Step>
+
+<Step title="Test and save">
+Use the **Test Pattern** feature to verify your rule matches the intended indices, then save.
+
+<Check>
+Rule successfully matches expected indices
+</Check>
+</Step>
+</Steps>
+
+### Team cost view
+
+Once attribution rules are configured, you'll see spending by team:
+
+| Team | Monthly Cost | % of Total | Growth | Top Index |
+|------|-------------|------------|--------|-----------|
+| **Frontend** | $4,200 | 33.6% | ↑ +8% | logs-frontend-* |
+| **Backend** | $3,100 | 24.8% | ↑ +3% | logs-api-* |
+| **Platform** | $2,800 | 22.4% | ↑ +12% | metrics-* |
+| **Data Science** | $1,500 | 12.0% | ↓ -5% | ml-models-* |
+| **Unattributed** | $900 | 7.2% | — | various |
+
+<Warning>
+**High unattributed costs?** This means many indices don't match your attribution rules. Add more rules to categorize all indices.
+</Warning>
+
+## Cost anomaly detection
+
+Shardly automatically detects unusual cost patterns:
+
+### Anomaly types
+
+<CardGroup cols={3}>
+<Card title="Spike" icon="arrow-up">
+Sudden cost increase (>20% in one day)
+</Card>
+
+<Card title="Sustained growth" icon="chart-line">
+Gradual increase over multiple days
+</Card>
+
+<Card title="New expense" icon="plus">
+New indices or teams appearing
+</Card>
+</CardGroup>
+
+### Anomaly alerts
+
+When an anomaly is detected, you'll see:
+
+```
+⚠️ Cost Anomaly Detected
+
+Deployment: production-us-east-1
+Date: 2024-08-15
+Increase: +$420/day (+18.2%)
+
+Root Cause:
+  - logs-prod-2024.08.15: +$350 (new index, no ILM)
+  - metrics-*: +$70 (traffic spike)
+
+Recommendation: Add ILM policy to logs-prod-* indices
+```
+
+<Tip>
+Use the AI Copilot to ask "Why did my costs increase?" for detailed analysis of any anomaly.
+</Tip>
+
+## Cost forecasting
+
+Project future costs based on historical trends:
+
+### Forecast models
+
+- **Linear projection**: Simple growth rate extrapolation
+- **Seasonal**: Accounts for weekday/weekend patterns
+- **Historical average**: Based on past 90 days
+
+### Forecast accuracy
+
+<Info>
+Forecasts include confidence intervals (±10%, ±20%). Accuracy improves with more historical data (90+ days recommended).
+</Info>
+
+## Export and reporting
+
+Generate cost reports for stakeholders:
+
+### Export formats
+
+<Tabs>
+<Tab title="CSV">
+Download raw cost data for analysis in Excel or Google Sheets.
+</Tab>
+
+<Tab title="PDF">
+Generate formatted reports with charts for executive presentations.
+</Tab>
+
+<Tab title="API">
+Access cost data programmatically via REST API for custom integrations.
+</Tab>
+</Tabs>
+
+### Scheduled reports
+
+Configure automatic email reports:
+
+- **Frequency**: Daily, weekly, or monthly
+- **Recipients**: Multiple email addresses
+- **Content**: Summary, full detail, or anomalies only
+- **Format**: PDF attachment or inline HTML
+
+<Check>
+Set up weekly cost reports for your team leads and monthly executive summaries
+</Check>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Review costs weekly" icon="calendar">
+Set a recurring calendar reminder to review cost trends and address anomalies quickly.
+</Accordion>
+
+<Accordion title="Aim for 95%+ attribution" icon="target">
+Ensure nearly all indices are categorized to teams for accurate chargeback.
+</Accordion>
+
+<Accordion title="Monitor growth rates" icon="chart-line">
+Sort by growth rate to catch runaway costs before they become budget problems.
+</Accordion>
+
+<Accordion title="Use tier distribution insights" icon="layer-group">
+If >70% of costs are on hot tier, you have significant optimization opportunities.
+</Accordion>
+</AccordionGroup>

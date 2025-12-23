@@ -1,0 +1,543 @@
+---
+title: Apply Recommendation
+api: POST /api/v1/recommendations/{recommendation_id}/apply
+description: "Execute a recommendation on your Elasticsearch cluster"
+---
+
+## Overview
+
+Execute a recommendation directly on your Elasticsearch cluster. This endpoint applies the Elasticsearch API commands defined in the recommendation's runbook.
+
+<Warning>
+**This endpoint makes real changes to your Elasticsearch cluster.** Always run `/validate` first to preview changes and check prerequisites.
+</Warning>
+
+<Tip>
+Shardly is the only tool that can programmatically apply Elasticsearch optimizations. Elastic AutoOps has no API.
+</Tip>
+
+## Authentication
+
+<ParamField header="Authorization" type="string" required>
+Bearer token for API authentication. Format: `Bearer YOUR_API_KEY`
+
+Get your API key from **Settings** → **API Keys** in the Shardly dashboard.
+</ParamField>
+
+## Path parameters
+
+<ParamField path="recommendation_id" type="string" required>
+Unique identifier of the recommendation to apply. Must be in `pending` or `failed` status (cannot re-apply completed recommendations).
+
+Example: `rec-a1b2c3d4`
+</ParamField>
+
+## Request body
+
+<ParamField body="skip_validation" type="boolean" default={false}>
+Skip pre-flight validation checks. **Not recommended** for production use.
+
+When `true`, Shardly will apply the recommendation without checking cluster health, disk space, or conflicts. Use only in emergencies or controlled environments.
+</ParamField>
+
+<ParamField body="notes" type="string">
+Optional notes to attach to this execution for audit trail and compliance.
+
+Best practice: Include approval references, testing notes, and expected outcomes.
+
+Example: `"JIRA-1234: Reduce costs on logs indices. Approved by @platform-lead. Tested on staging-logs (2024-08-10)."`
+</ParamField>
+
+## Request example
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-a1b2c3d4/apply" \
+  -H "Authorization: Bearer shrd_sk_1234567890abcdef" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "skip_validation": false,
+    "notes": "JIRA-1234: Approved by @manager. Tested on staging first."
+  }'
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.shardly.io/api/v1/recommendations/rec-a1b2c3d4/apply",
+    headers={
+        "Authorization": "Bearer shrd_sk_1234567890abcdef",
+        "Content-Type": "application/json"
+    },
+    json={
+        "skip_validation": False,
+        "notes": "JIRA-1234: Approved by @manager"
+    }
+)
+
+result = response.json()
+print(f"Execution ID: {result['execution_id']}")
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.shardly.io/api/v1/recommendations/rec-a1b2c3d4/apply',
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer shrd_sk_1234567890abcdef',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      skip_validation: false,
+      notes: 'JIRA-1234: Approved by @manager'
+    })
+  }
+);
+
+const result = await response.json();
+console.log('Execution ID:', result.execution_id);
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="execution_id" type="string" required>
+Unique identifier for tracking this execution. Use this to poll for status updates and rollback if needed.
+
+Format: `exec-{random}`
+</ResponseField>
+
+<ResponseField name="recommendation_id" type="string" required>
+The ID of the recommendation being executed. Included for reference.
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+Initial execution status. Will be `validating` or `in_progress` depending on `skip_validation` parameter.
+
+Possible values: `validating`, `in_progress`
+</ResponseField>
+
+<ResponseField name="message" type="string" required>
+Human-readable status message explaining next steps.
+</ResponseField>
+
+<ResponseField name="started_at" type="timestamp" required>
+ISO 8601 timestamp when execution started.
+</ResponseField>
+
+## Response example
+
+<ResponseExample>
+```json 200 Success
+{
+  "execution_id": "exec-x7y8z9a0",
+  "recommendation_id": "rec-a1b2c3d4",
+  "status": "validating",
+  "message": "Execution started. Running pre-flight validation checks.",
+  "started_at": "2024-08-15T10:30:00Z"
+}
+```
+
+```json 400 Bad Request - Already Implemented
+{
+  "detail": "Recommendation already implemented",
+  "status_code": 400,
+  "recommendation_id": "rec-a1b2c3d4",
+  "current_status": "implemented",
+  "implemented_at": "2024-08-10T14:22:00Z"
+}
+```
+
+```json 400 Bad Request - Validation Failed
+{
+  "detail": "Pre-flight validation failed",
+  "status_code": 400,
+  "validation_errors": [
+    {
+      "check": "cluster_health",
+      "status": "failed",
+      "message": "Cluster health is RED - not safe to make changes",
+      "details": {
+        "status": "red",
+        "unassigned_shards": 23
+      }
+    },
+    {
+      "check": "disk_space",
+      "status": "warning",
+      "message": "Node es-01 has 89% disk usage"
+    }
+  ]
+}
+```
+
+```json 404 Not Found
+{
+  "detail": "Recommendation not found",
+  "status_code": 404,
+  "recommendation_id": "rec-invalid"
+}
+```
+
+```json 409 Conflict - Execution Already Running
+{
+  "detail": "Another execution is already running for this deployment",
+  "status_code": 409,
+  "existing_execution_id": "exec-previous123",
+  "existing_execution_status": "in_progress"
+}
+```
+</ResponseExample>
+
+## Execution lifecycle
+
+The apply operation runs **asynchronously** in the background. You'll receive an `execution_id` immediately and can poll for status updates.
+
+<Steps>
+<Step title="Validation (unless skipped)">
+Runs pre-flight safety checks:
+- Cluster health
+- Target indices exist
+- No conflicting operations
+- Adequate disk space
+- Recommendation-specific checks
+</Step>
+
+<Step title="Before snapshot">
+Captures current cluster state including:
+- Cluster health status
+- Index statistics
+- Shard distribution
+- ILM policy settings
+</Step>
+
+<Step title="Execute commands">
+Runs each Elasticsearch API command defined in the runbook, one at a time in sequence.
+</Step>
+
+<Step title="After snapshot">
+Captures new cluster state for comparison.
+</Step>
+
+<Step title="Track change">
+Creates a tracked change record to verify savings over the next 7 days.
+</Step>
+</Steps>
+
+## Tracking execution progress
+
+Poll the status endpoint to track execution progress in real-time:
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.shardly.io/api/v1/recommendations/execution/exec-x7y8z9a0/status" \
+  -H "Authorization: Bearer shrd_sk_1234567890abcdef"
+```
+
+```python Python
+import requests
+import time
+
+execution_id = "exec-x7y8z9a0"
+
+while True:
+    response = requests.get(
+        f"https://api.shardly.io/api/v1/recommendations/execution/{execution_id}/status",
+        headers={"Authorization": "Bearer shrd_sk_1234567890abcdef"}
+    )
+    
+    status = response.json()
+    print(f"Progress: {status['progress_percent']}%")
+    
+    if status['status'] in ['completed', 'failed', 'rolled_back']:
+        break
+    
+    time.sleep(2)  # Poll every 2 seconds
+
+print(f"Final status: {status['status']}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json In Progress
+{
+  "execution_id": "exec-x7y8z9a0",
+  "recommendation_id": "rec-a1b2c3d4",
+  "deployment_id": "dep-prod-us-east",
+  "status": "in_progress",
+  "current_step": 3,
+  "total_steps": 5,
+  "progress_percent": 60,
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Capture before snapshot",
+      "status": "completed",
+      "duration_seconds": 0.8,
+      "completed_at": "2024-08-15T10:30:01Z"
+    },
+    {
+      "step_number": 2,
+      "title": "Create ILM policy",
+      "status": "completed",
+      "duration_seconds": 1.2,
+      "completed_at": "2024-08-15T10:30:03Z"
+    },
+    {
+      "step_number": 3,
+      "title": "Update index templates",
+      "status": "in_progress",
+      "started_at": "2024-08-15T10:30:03Z"
+    },
+    {
+      "step_number": 4,
+      "title": "Apply policy to indices",
+      "status": "pending"
+    },
+    {
+      "step_number": 5,
+      "title": "Capture after snapshot",
+      "status": "pending"
+    }
+  ],
+  "started_at": "2024-08-15T10:30:00Z",
+  "completed_at": null,
+  "error": null,
+  "rollback_available": true,
+  "notes": "JIRA-1234: Approved by @manager"
+}
+```
+
+```json Completed
+{
+  "execution_id": "exec-x7y8z9a0",
+  "recommendation_id": "rec-a1b2c3d4",
+  "deployment_id": "dep-prod-us-east",
+  "status": "completed",
+  "current_step": 5,
+  "total_steps": 5,
+  "progress_percent": 100,
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Capture before snapshot",
+      "status": "completed",
+      "duration_seconds": 0.8
+    },
+    {
+      "step_number": 2,
+      "title": "Create ILM policy",
+      "status": "completed",
+      "duration_seconds": 1.2
+    },
+    {
+      "step_number": 3,
+      "title": "Update index templates",
+      "status": "completed",
+      "duration_seconds": 0.5
+    },
+    {
+      "step_number": 4,
+      "title": "Apply policy to indices",
+      "status": "completed",
+      "duration_seconds": 2.1
+    },
+    {
+      "step_number": 5,
+      "title": "Capture after snapshot",
+      "status": "completed",
+      "duration_seconds": 0.9
+    }
+  ],
+  "started_at": "2024-08-15T10:30:00Z",
+  "completed_at": "2024-08-15T10:30:06Z",
+  "total_duration_seconds": 5.5,
+  "error": null,
+  "rollback_available": true,
+  "notes": "JIRA-1234: Approved by @manager"
+}
+```
+
+```json Failed
+{
+  "execution_id": "exec-x7y8z9a0",
+  "recommendation_id": "rec-a1b2c3d4",
+  "status": "failed",
+  "current_step": 3,
+  "total_steps": 5,
+  "progress_percent": 40,
+  "steps": [
+    {
+      "step_number": 1,
+      "title": "Capture before snapshot",
+      "status": "completed"
+    },
+    {
+      "step_number": 2,
+      "title": "Create ILM policy",
+      "status": "completed"
+    },
+    {
+      "step_number": 3,
+      "title": "Update index templates",
+      "status": "failed",
+      "error": "resource_already_exists_exception: index template [shardly-optimized-logs] already exists"
+    }
+  ],
+  "started_at": "2024-08-15T10:30:00Z",
+  "completed_at": "2024-08-15T10:30:04Z",
+  "error": "Execution failed at step 3: resource_already_exists_exception",
+  "rollback_available": true
+}
+```
+</ResponseExample>
+
+## Execution status values
+
+| Status | Description | What to do |
+|--------|-------------|------------|
+| `pending` | Queued, waiting to start | Wait for execution to begin |
+| `validating` | Running pre-flight checks | Review validation results when complete |
+| `in_progress` | Executing Elasticsearch commands | Poll for progress updates |
+| `completed` | Successfully finished | Review results and verify savings |
+| `failed` | Error occurred during execution | Review error details, consider rollback |
+| `rolled_back` | Changes were reverted | Investigation required |
+
+<Info>
+Use the `/status` endpoint to poll the current execution state. Recommended polling interval: every 2-3 seconds.
+</Info>
+
+## Rolling back changes
+
+If execution fails or causes unexpected behavior, rollback the changes:
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.shardly.io/api/v1/recommendations/execution/exec-x7y8z9a0/rollback" \
+  -H "Authorization: Bearer shrd_sk_1234567890abcdef"
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.shardly.io/api/v1/recommendations/execution/exec-x7y8z9a0/rollback",
+    headers={"Authorization": "Bearer shrd_sk_1234567890abcdef"}
+)
+
+result = response.json()
+print(f"Rollback status: {result['status']}")
+```
+</RequestExample>
+
+<Warning>
+**Not all changes can be rolled back:**
+
+- Deleted indices (data is permanently lost)
+- Merged segments (cannot be unmerged)
+- Force-merged indices (segments remain merged)
+
+**Can be rolled back:**
+- ILM policy changes
+- Replica count changes
+- Allocation settings
+- Index settings
+</Warning>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Always validate before applying" icon="shield-check">
+Never skip the validation step in production:
+
+```bash
+# 1. Validate first
+curl -X POST ".../recommendations/rec-123/validate"
+
+# 2. Review validation results
+
+# 3. Apply only if validation passed
+curl -X POST ".../recommendations/rec-123/apply"
+```
+
+Validation catches issues like red cluster health, missing indices, or conflicting operations.
+</Accordion>
+
+<Accordion title="Include detailed notes" icon="note-sticky">
+Add comprehensive notes for audit trail and compliance:
+
+```json
+{
+  "notes": "JIRA-1234: Reduce costs on logs indices. Approved by @platform-lead. Tested on staging-logs (2024-08-10). Expected savings: $780/month."
+}
+```
+
+Good notes help with troubleshooting and compliance reporting.
+</Accordion>
+
+<Accordion title="Poll for completion" icon="arrows-rotate">
+Don't assume immediate completion - poll until status is terminal:
+
+```python
+import time
+
+while True:
+    status = get_execution_status(execution_id)
+    
+    if status['status'] in ['completed', 'failed', 'rolled_back']:
+        break
+    
+    print(f"Progress: {status['progress_percent']}%")
+    time.sleep(2)  # Poll every 2 seconds
+```
+</Accordion>
+
+<Accordion title="Handle failures gracefully" icon="triangle-exclamation">
+Always check for failures and rollback if needed:
+
+```python
+if status['status'] == 'failed':
+    print(f"Failed at step {status['current_step']}: {status['error']}")
+    
+    if status['rollback_available']:
+        print("Rolling back changes...")
+        rollback(execution_id)
+    else:
+        print("Manual intervention required")
+```
+</Accordion>
+
+<Accordion title="Respect rate limits" icon="gauge-high">
+Shardly enforces rate limits to protect cluster stability:
+
+- **10 apply requests per minute per organization**
+- **Only 1 active execution per deployment**
+
+If you hit rate limits, wait before retrying.
+</Accordion>
+</AccordionGroup>
+
+## Required permissions
+
+Your API key must have the following permission:
+
+- `execute:recommendations` - Apply and rollback recommendations
+
+<Info>
+Create API keys with specific permissions in **Settings** → **API Keys**.
+</Info>
+
+## Rate limits
+
+| Limit | Value |
+|-------|-------|
+| Apply requests per minute | 10 per organization |
+| Concurrent executions per deployment | 1 |
+| Concurrent executions per organization | 5 |
+
+<Tip>
+Use webhooks to get notified when executions complete instead of polling aggressively.
+</Tip>
+

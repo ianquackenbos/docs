@@ -1,0 +1,377 @@
+---
+title: Production Deployment
+description: "Best practices for deploying Shardly in production"
+---
+
+## Overview
+
+This guide covers production deployment considerations, security hardening, and operational best practices.
+
+## Architecture Recommendations
+
+### High Availability
+
+```
+                    ┌─────────────────┐
+                    │  Load Balancer  │
+                    │   (TLS Term)    │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+        ┌─────▼─────┐  ┌─────▼─────┐  ┌─────▼─────┐
+        │ Frontend  │  │ Frontend  │  │ Frontend  │
+        │  Pod 1    │  │  Pod 2    │  │  Pod 3    │
+        └───────────┘  └───────────┘  └───────────┘
+              │              │              │
+              └──────────────┼──────────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              │              │              │
+        ┌─────▼─────┐  ┌─────▼─────┐  ┌─────▼─────┐
+        │ Backend   │  │ Backend   │  │ Backend   │
+        │  Pod 1    │  │  Pod 2    │  │  Pod 3    │
+        └───────────┘  └───────────┘  └───────────┘
+              │              │              │
+              └──────────────┼──────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        │                    │                    │
+  ┌─────▼─────┐        ┌─────▼─────┐        ┌─────▼─────┐
+  │ PostgreSQL │        │   Redis   │        │  Worker   │
+  │  Primary   │        │  Cluster  │        │  Pods     │
+  │  +Replica  │        │           │        │  (1-10)   │
+  └───────────┘        └───────────┘        └───────────┘
+```
+
+### Resource Requirements
+
+| Component | CPU | Memory | Replicas |
+|-----------|-----|--------|----------|
+| Frontend | 0.5-1 core | 512MB | 2-3 |
+| Backend | 1-2 cores | 1-2GB | 2-3 |
+| Worker | 0.5-1 core | 512MB-1GB | 1-10 |
+| PostgreSQL | 2-4 cores | 4-8GB | 1-2 |
+| Redis | 0.5-1 core | 512MB-1GB | 3 (cluster) |
+
+## Security Hardening
+
+### Network Security
+
+1. **Use private networks** for internal communication
+2. **Restrict ingress** to only required ports
+3. **Enable TLS** for all external traffic
+4. **Use VPC peering** for Elastic Cloud connection
+
+```yaml
+# Kubernetes NetworkPolicy example
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+```
+
+### Secret Management
+
+<Tabs>
+  <Tab title="AWS Secrets Manager">
+    ```python
+    import boto3
+    import json
+    
+    def get_secret(secret_name):
+        client = boto3.client('secretsmanager')
+        response = client.get_secret_value(SecretId=secret_name)
+        return json.loads(response['SecretString'])
+    
+    secrets = get_secret('shardly/production')
+    database_url = secrets['DATABASE_URL']
+    ```
+  </Tab>
+  <Tab title="HashiCorp Vault">
+    ```bash
+    # Store secrets
+    vault kv put secret/shardly \
+      DATABASE_URL="postgresql://..." \
+      ENCRYPTION_KEY="..." \
+      CLERK_SECRET_KEY="..."
+    
+    # Inject into pods using Vault Agent
+    ```
+  </Tab>
+  <Tab title="Kubernetes Secrets">
+    ```yaml
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: shardly-secrets
+    type: Opaque
+    data:
+      DATABASE_URL: cG9zdGdyZXNxbDovLy4uLg==
+      ENCRYPTION_KEY: Li4u
+    ```
+  </Tab>
+</Tabs>
+
+### Database Security
+
+```sql
+-- Create read-only user for reporting
+CREATE USER shardly_readonly WITH PASSWORD 'secure-password';
+GRANT CONNECT ON DATABASE shardly TO shardly_readonly;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO shardly_readonly;
+
+-- Enable row-level security (optional)
+ALTER TABLE deployments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY org_isolation ON deployments
+  USING (organization_id = current_setting('app.organization_id')::uuid);
+```
+
+## Monitoring
+
+### Metrics to Track
+
+| Metric | Alert Threshold |
+|--------|-----------------|
+| API Response Time | P99 > 2s |
+| Error Rate | > 1% |
+| CPU Usage | > 80% |
+| Memory Usage | > 85% |
+| Database Connections | > 80% of pool |
+| Celery Queue Length | > 100 |
+| Sync Failures | > 3 consecutive |
+
+### Prometheus Metrics
+
+```python
+# backend/app/metrics.py
+from prometheus_client import Counter, Histogram, Gauge
+
+request_count = Counter(
+    'shardly_requests_total',
+    'Total requests',
+    ['method', 'endpoint', 'status']
+)
+
+request_latency = Histogram(
+    'shardly_request_latency_seconds',
+    'Request latency',
+    ['method', 'endpoint']
+)
+
+active_connections = Gauge(
+    'shardly_active_connections',
+    'Active Elastic Cloud connections'
+)
+```
+
+### Logging
+
+```python
+# Structured logging
+import structlog
+
+logger = structlog.get_logger()
+
+logger.info(
+    "recommendation_applied",
+    recommendation_id=rec_id,
+    user_id=user_id,
+    savings_estimate=780,
+)
+```
+
+Ship logs to centralized logging (ELK, Datadog, CloudWatch).
+
+## Backup Strategy
+
+### Database Backups
+
+```bash
+# Daily automated backup
+0 2 * * * pg_dump -h $DB_HOST -U shardly shardly | gzip > /backups/shardly_$(date +%Y%m%d).sql.gz
+
+# Upload to S3
+aws s3 cp /backups/shardly_$(date +%Y%m%d).sql.gz s3://shardly-backups/
+```
+
+### Point-in-Time Recovery
+
+Enable WAL archiving for PostgreSQL:
+
+```
+archive_mode = on
+archive_command = 'aws s3 cp %p s3://shardly-backups/wal/%f'
+```
+
+### Backup Verification
+
+```bash
+# Weekly restore test
+pg_restore -d shardly_test /backups/shardly_latest.sql
+```
+
+## Disaster Recovery
+
+### RTO/RPO Targets
+
+| Tier | RTO | RPO |
+|------|-----|-----|
+| Database | 4 hours | 1 hour |
+| Application | 30 minutes | N/A |
+| Redis | 15 minutes | 5 minutes |
+
+### Failover Procedure
+
+1. **Detect failure** via monitoring alerts
+2. **Promote replica** to primary (database)
+3. **Update DNS** to point to new primary
+4. **Verify application** connectivity
+5. **Notify stakeholders**
+
+## Performance Tuning
+
+### Database
+
+```sql
+-- Connection pooling (use PgBouncer)
+-- Recommended: pool_size = (core_count * 2) + disk_count
+
+-- Index optimization
+CREATE INDEX CONCURRENTLY idx_billing_snapshots_deployment_time 
+  ON billing_snapshots(deployment_id, snapshot_time DESC);
+
+-- Query optimization
+EXPLAIN ANALYZE SELECT ...;
+```
+
+### Redis
+
+```
+# redis.conf
+maxmemory 1gb
+maxmemory-policy allkeys-lru
+```
+
+### Application
+
+```python
+# Connection pooling
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=20,
+    max_overflow=10,
+    pool_timeout=30,
+)
+
+# Caching
+@cache(ttl=300)
+async def get_cost_overview(deployment_id):
+    ...
+```
+
+## Scaling
+
+### Horizontal Scaling
+
+```bash
+# Scale backend pods
+kubectl scale deployment backend --replicas=5
+
+# Scale workers based on queue length
+kubectl autoscale deployment worker --min=2 --max=10 --cpu-percent=70
+```
+
+### Vertical Scaling
+
+Increase resources for:
+- Database during heavy sync periods
+- Workers during bulk analysis
+- Backend during high API load
+
+## Maintenance
+
+### Zero-Downtime Deployments
+
+```yaml
+# Kubernetes rolling update
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+```
+
+### Database Migrations
+
+```bash
+# Run migrations during low-traffic period
+kubectl exec -it backend-pod -- alembic upgrade head
+
+# For large migrations, use online DDL tools
+gh-ost --execute --alter "ADD COLUMN new_col VARCHAR(255)"
+```
+
+### Dependency Updates
+
+1. Update dependencies in dev environment
+2. Run full test suite
+3. Deploy to staging
+4. Monitor for 24-48 hours
+5. Deploy to production
+
+## Compliance
+
+### Data Retention
+
+```python
+# Automatic cleanup of old data
+@celery.task
+def cleanup_old_data():
+    cutoff = datetime.now() - timedelta(days=365)
+    session.query(BillingSnapshot).filter(
+        BillingSnapshot.created_at < cutoff
+    ).delete()
+```
+
+### Audit Logging
+
+```python
+# Log all sensitive operations
+logger.info(
+    "recommendation_executed",
+    user_id=user_id,
+    recommendation_id=rec_id,
+    ip_address=request.client.host,
+    user_agent=request.headers.get("user-agent"),
+)
+```
+
+### GDPR Compliance
+
+- Implement data export (`GET /api/v1/user/export`)
+- Implement data deletion (`DELETE /api/v1/user`)
+- Document data processing in privacy policy
+

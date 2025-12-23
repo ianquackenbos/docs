@@ -1,0 +1,147 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Shardly",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@shardly.io"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://app.shardly.io"
+  },
+  "tabs": [
+    {
+      "name": "API Reference",
+      "url": "api-reference"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/shardly/shardly"
+    },
+    {
+      "name": "Community",
+      "icon": "discord",
+      "url": "https://discord.gg/shardly"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "concepts"
+      ]
+    },
+    {
+      "group": "Features",
+      "pages": [
+        "features/cost-analysis",
+        "features/recommendations",
+        "features/auto-apply",
+        "features/savings-tracking",
+        "features/ai-copilot"
+      ]
+    },
+    {
+      "group": "Integrations",
+      "pages": [
+        "integrations/elastic-cloud",
+        "integrations/self-managed",
+        "integrations/authentication"
+      ]
+    },
+    {
+      "group": "Configuration",
+      "pages": [
+        "configuration/environment",
+        "configuration/cost-rules",
+        "configuration/teams"
+      ]
+    },
+    {
+      "group": "Deployment",
+      "pages": [
+        "deployment/docker",
+        "deployment/kubernetes",
+        "deployment/production"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction",
+        "api-reference/authentication"
+      ]
+    },
+    {
+      "group": "Connections",
+      "pages": [
+        "api-reference/connections/list",
+        "api-reference/connections/create",
+        "api-reference/connections/get",
+        "api-reference/connections/sync"
+      ]
+    },
+    {
+      "group": "Deployments",
+      "pages": [
+        "api-reference/deployments/list",
+        "api-reference/deployments/get"
+      ]
+    },
+    {
+      "group": "Costs",
+      "pages": [
+        "api-reference/costs/overview",
+        "api-reference/costs/trend",
+        "api-reference/costs/by-tier",
+        "api-reference/costs/by-team",
+        "api-reference/costs/indices"
+      ]
+    },
+    {
+      "group": "Recommendations",
+      "pages": [
+        "api-reference/recommendations/list",
+        "api-reference/recommendations/get",
+        "api-reference/recommendations/analyze",
+        "api-reference/recommendations/validate",
+        "api-reference/recommendations/apply",
+        "api-reference/recommendations/rollback"
+      ]
+    },
+    {
+      "group": "Copilot",
+      "pages": [
+        "api-reference/copilot/chat",
+        "api-reference/copilot/conversations"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/shardly",
+    "github": "https://github.com/shardly",
+    "linkedin": "https://linkedin.com/company/shardly"
+  }
+}
+

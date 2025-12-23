@@ -1,0 +1,523 @@
+---
+title: Authentication Integration
+description: "Configure user authentication with Clerk"
+---
+
+## Overview
+
+Shardly uses [Clerk](https://clerk.com) for user authentication and organization management. Clerk provides enterprise-grade security with a modern, customizable authentication experience.
+
+<Info>
+**Why Clerk?** Industry-leading authentication with built-in security features, social login, MFA, and organization management - so Shardly can focus on Elasticsearch optimization.
+</Info>
+
+## Authentication features
+
+<CardGroup cols={2}>
+<Card title="Multiple sign-in methods" icon="right-to-bracket">
+Email/password, social login (Google, GitHub, Microsoft), and SSO for enterprise
+</Card>
+
+<Card title="Multi-factor authentication" icon="shield-halved">
+Optional MFA with authenticator apps, SMS, or email codes
+</Card>
+
+<Card title="Organization management" icon="users">
+Team collaboration with role-based permissions and invitations
+</Card>
+
+<Card title="Session security" icon="clock">
+Automatic session management, device tracking, and suspicious activity detection
+</Card>
+</CardGroup>
+
+## For end users
+
+### Creating an account
+
+<Steps>
+<Step title="Visit Shardly">
+Navigate to your Shardly instance (e.g., `https://shardly.yourcompany.com`)
+
+You'll be automatically redirected to the sign-in page.
+</Step>
+
+<Step title="Choose sign-in method">
+
+<Tabs>
+<Tab title="Email/Password">
+1. Click **Sign up** 
+2. Enter your email address
+3. Create a strong password (12+ characters, mixed case, numbers, symbols)
+4. Click **Continue**
+5. Verify your email by clicking the link sent to your inbox
+
+<Check>
+Email verified - you can now sign in
+</Check>
+</Tab>
+
+<Tab title="Social Login">
+1. Click **Sign up**
+2. Choose a provider:
+   - **Continue with Google**
+   - **Continue with GitHub**
+   - **Continue with Microsoft**
+3. Authorize Shardly in the provider's consent screen
+4. Your account is created automatically
+
+<Tip>
+Social login is faster and you don't need to remember another password!
+</Tip>
+</Tab>
+
+<Tab title="SSO (Enterprise)">
+If your organization uses SSO:
+
+1. Click **Sign in with SSO**
+2. Enter your company email domain
+3. You'll be redirected to your company's identity provider
+4. Sign in with your corporate credentials
+5. Approved! You're signed in to Shardly
+
+<Info>
+SSO must be configured by your administrator first. Contact your IT team if you don't see the SSO option.
+</Info>
+</Tab>
+</Tabs>
+</Step>
+
+<Step title="Complete profile">
+After first sign-in:
+
+1. **Add profile photo** (optional) - Helps team members recognize you
+2. **Set display name** - How you appear in Shardly
+3. **Enable MFA** (recommended) - Add extra security to your account
+
+<Check>
+Profile complete - ready to use Shardly
+</Check>
+</Step>
+</Steps>
+
+### Enabling multi-factor authentication (MFA)
+
+Add an extra layer of security to your account:
+
+<Steps>
+<Step title="Access security settings">
+1. Click your **profile picture** in the top-right
+2. Select **Account settings**
+3. Go to **Security** tab
+4. Click **Enable two-factor authentication**
+</Step>
+
+<Step title="Choose MFA method">
+
+<Tabs>
+<Tab title="Authenticator App (Recommended)">
+1. Download an authenticator app:
+   - Google Authenticator (iOS/Android)
+   - Authy (iOS/Android/Desktop)
+   - 1Password (built-in)
+2. Scan the QR code shown in Shardly
+3. Enter the 6-digit code from your app
+4. Save your backup codes securely
+
+<Warning>
+**Save backup codes!** You'll need them if you lose access to your authenticator app.
+</Warning>
+</Tab>
+
+<Tab title="SMS">
+1. Enter your mobile phone number
+2. Click **Send code**
+3. Enter the 6-digit code received via SMS
+4. Confirm your phone number
+
+<Info>
+SMS is less secure than authenticator apps due to SIM swapping attacks. Use authenticator apps when possible.
+</Info>
+</Tab>
+</Tabs>
+
+<Check>
+MFA enabled - your account is more secure
+</Check>
+</Step>
+</Steps>
+
+### Managing your organization
+
+<AccordionGroup>
+<Accordion title="Create an organization" icon="building">
+Organizations let you collaborate with team members:
+
+1. Click **Organization** in the top-left
+2. Select **Create organization**
+3. Enter organization name (e.g., "Acme Inc")
+4. Click **Create**
+
+You're automatically the organization admin.
+</Accordion>
+
+<Accordion title="Invite team members" icon="user-plus">
+Add colleagues to your organization:
+
+1. Go to **Organization settings**
+2. Click **Members** tab
+3. Click **Invite members**
+4. Enter email addresses (comma-separated for multiple)
+5. Choose role:
+   - **Admin** - Full access, can manage settings
+   - **Member** - Can view and edit data
+   - **Viewer** - Read-only access
+6. Click **Send invitations**
+
+Invitees receive an email with a link to join.
+</Accordion>
+
+<Accordion title="Switch between organizations" icon="arrows-rotate">
+If you're part of multiple organizations:
+
+1. Click current organization name (top-left)
+2. Select different organization from dropdown
+3. Dashboard updates to show that organization's data
+
+<Tip>
+Use keyboard shortcut `Cmd/Ctrl + K` to quick-switch organizations.
+</Tip>
+</Accordion>
+</AccordionGroup>
+
+## For administrators
+
+### Initial Clerk setup
+
+<Steps>
+<Step title="Create Clerk account">
+1. Go to [clerk.com](https://clerk.com)
+2. Sign up for an account
+3. Create a new application
+4. Name it "Shardly" or your company name
+</Step>
+
+<Step title="Configure sign-in methods">
+Enable authentication methods for your users:
+
+1. Go to **User & Authentication** → **Email, Phone, Username**
+2. Enable **Email address**
+3. Toggle **Password** requirement
+4. Optional: Enable **Phone number** for SMS MFA
+
+<Info>
+Most organizations start with just email/password and add social login or SSO later.
+</Info>
+</Step>
+
+<Step title="Add social providers (optional)">
+Enable social login:
+
+1. Go to **Social Connections**
+2. Enable desired providers:
+   - **Google** - Most popular, works with Google Workspace
+   - **GitHub** - Great for engineering teams
+   - **Microsoft** - Works with Microsoft 365/Azure AD
+3. For each provider:
+   - Create OAuth app in provider's developer console
+   - Copy Client ID and Client Secret
+   - Paste into Clerk
+   - Save
+
+<Tip>
+Google and GitHub are the most commonly used. Start with those.
+</Tip>
+</Step>
+
+<Step title="Configure environment variables">
+Copy your Clerk keys to Shardly's environment:
+
+```bash
+# Backend (.env)
+CLERK_SECRET_KEY=sk_live_xxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxx
+
+# Frontend (.env.local)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxxxx
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
+```
+
+Find these in **API Keys** section of Clerk dashboard.
+
+<Warning>
+Use **Test** keys for development, **Live** keys for production. Never commit keys to version control!
+</Warning>
+</Step>
+
+<Step title="Set up webhooks">
+Sync user data between Clerk and Shardly:
+
+1. In Clerk dashboard, go to **Webhooks**
+2. Click **Add Endpoint**
+3. Enter webhook URL: `https://api.shardly.io/api/v1/auth/webhook`
+4. Select events to send:
+   - `user.created`
+   - `user.updated`
+   - `user.deleted`
+   - `organization.created`
+   - `organization.updated`
+   - `organization.deleted`
+   - `organizationMembership.created`
+   - `organizationMembership.deleted`
+5. Copy the **Signing Secret**
+6. Add to your backend `.env` as `CLERK_WEBHOOK_SECRET`
+
+<Check>
+Webhook configured - user changes sync automatically
+</Check>
+</Step>
+</Steps>
+
+### Configuring SSO (Enterprise)
+
+For enterprise customers using SAML or OIDC:
+
+<Tabs>
+<Tab title="SAML Setup">
+<Steps>
+<Step title="Enable SAML in Clerk">
+1. Upgrade to Clerk Enterprise plan
+2. Go to **Authentication** → **Enterprise Connections**
+3. Click **Add Connection** → **SAML**
+</Step>
+
+<Step title="Configure identity provider">
+In your IdP (Okta, Azure AD, Google Workspace, etc.):
+
+1. Create new SAML application
+2. Set ACS URL: `https://clerk.yourcompany.com/v1/saml/acs`
+3. Set Entity ID: `https://clerk.yourcompany.com`
+4. Map attributes:
+   - `email` → Email address
+   - `firstName` → First name
+   - `lastName` → Last name
+5. Download IdP metadata XML
+</Step>
+
+<Step title="Complete Clerk configuration">
+1. Upload IdP metadata XML to Clerk
+2. Set allowed domains (e.g., `yourcompany.com`)
+3. Enable connection
+4. Test SSO flow
+
+<Check>
+SSO working - employees can sign in with corporate credentials
+</Check>
+</Step>
+</Steps>
+</Tab>
+
+<Tab title="OIDC Setup">
+<Steps>
+<Step title="Enable OIDC in Clerk">
+1. Go to **Enterprise Connections**
+2. Click **Add Connection** → **OIDC**
+</Step>
+
+<Step title="Get OIDC details from IdP">
+From your identity provider, collect:
+- Issuer URL
+- Client ID
+- Client Secret
+- Authorization endpoint
+- Token endpoint
+- User info endpoint
+</Step>
+
+<Step title="Configure in Clerk">
+1. Enter OIDC configuration details
+2. Set scope: `openid profile email`
+3. Map claims to user attributes
+4. Set allowed domains
+5. Test connection
+
+<Check>
+OIDC SSO configured successfully
+</Check>
+</Step>
+</Steps>
+</Tab>
+</Tabs>
+
+### Managing users and permissions
+
+<AccordionGroup>
+<Accordion title="User roles" icon="user-tag">
+Shardly uses Clerk's organization roles:
+
+| Role | Permissions | Use For |
+|------|-------------|---------|
+| **Admin** | Full access - manage settings, users, billing | Team leads, managers |
+| **Member** | View and edit all data | Engineers, analysts |
+| **Viewer** | Read-only access | Executives, stakeholders |
+
+Assign roles when inviting users or in **Organization settings** → **Members**.
+</Accordion>
+
+<Accordion title="Reviewing active sessions" icon="clock">
+Monitor who's signed in:
+
+1. Clerk dashboard → **Users**
+2. Click a user
+3. Go to **Sessions** tab
+4. See all active sessions with device info
+
+You can revoke sessions to sign users out remotely.
+</Accordion>
+
+<Accordion title="Handling suspended users" icon="user-lock">
+To suspend a user (prevents sign-in):
+
+1. Clerk dashboard → **Users**
+2. Find the user
+3. Click **...** menu → **Suspend user**
+
+Suspended users cannot sign in but their data remains.
+
+To permanently delete:
+- **...** menu → **Delete user**
+- This removes all user data (irreversible!)
+</Accordion>
+</AccordionGroup>
+
+## Security best practices
+
+<AccordionGroup>
+<Accordion title="Require MFA for admins" icon="shield-check">
+Protect privileged accounts:
+
+1. Clerk dashboard → **Restrictions**
+2. Enable **Require MFA for admin role**
+3. Set grace period (e.g., 7 days)
+
+Admins must enable MFA within the grace period or lose access.
+</Accordion>
+
+<Accordion title="Configure password policies" icon="lock">
+Strengthen password requirements:
+
+1. Go to **Authentication** → **Email, Phone, Username**
+2. Click **Password** settings
+3. Configure:
+   - Minimum length (12+ recommended)
+   - Require uppercase
+   - Require numbers
+   - Require symbols
+   - Password history (prevent reuse)
+4. Enable **Have I Been Pwned** check
+
+<Tip>
+Stronger passwords = better security, but balance with user experience.
+</Tip>
+</Accordion>
+
+<Accordion title="Monitor sign-in attempts" icon="chart-line">
+Watch for suspicious activity:
+
+1. Clerk dashboard → **Monitoring**
+2. Review:
+   - Failed sign-in attempts
+   - Geographic anomalies
+   - Unusual devices
+3. Enable email alerts for:
+   - Multiple failed attempts
+   - New device sign-ins
+   - Password changes
+</Accordion>
+
+<Accordion title="Set session timeouts" icon="hourglass">
+Auto sign-out inactive users:
+
+1. **Settings** → **Sessions**
+2. Set inactivity timeout (e.g., 30 days)
+3. Set absolute timeout (e.g., 90 days)
+4. Require re-authentication for sensitive actions
+
+<Info>
+Balance security (shorter timeout) with user experience (longer timeout).
+</Info>
+</Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="Users can't sign in" icon="circle-xmark">
+**Common causes:**
+
+1. **Email not verified**
+   - User must click verification link in email
+   - Resend from Clerk dashboard
+
+2. **Account suspended**
+   - Check user status in Clerk dashboard
+   - Unsuspend if appropriate
+
+3. **Wrong password**
+   - Use "Forgot password?" link
+   - Or admin can reset in Clerk dashboard
+
+4. **SSO not working**
+   - Verify SSO connection is active
+   - Check user's email domain is allowed
+   - Test SSO connection in Clerk
+</Accordion>
+
+<Accordion title="Webhooks not firing" icon="webhook">
+**Symptoms:** User changes don't sync to Shardly
+
+**Diagnosis:**
+1. Clerk dashboard → **Webhooks**
+2. Check recent deliveries
+3. Look for failed attempts
+
+**Common fixes:**
+- Verify webhook URL is correct
+- Check `CLERK_WEBHOOK_SECRET` matches
+- Ensure Shardly backend is accessible
+- Review webhook payload format
+</Accordion>
+
+<Accordion title="Social login errors" icon="right-from-bracket">
+**"OAuth error"** or **"Failed to connect"**
+
+**Causes:**
+1. OAuth app not configured in provider
+2. Client ID/Secret incorrect
+3. Redirect URI mismatch
+
+**Fix:**
+1. Check OAuth app settings in provider console
+2. Verify redirect URI matches Clerk's expected format
+3. Regenerate Client Secret if needed
+</Accordion>
+</AccordionGroup>
+
+## Support and resources
+
+<CardGroup cols={3}>
+<Card title="Clerk documentation" icon="book" href="https://clerk.com/docs">
+Official Clerk docs for detailed configuration
+</Card>
+
+<Card title="Clerk support" icon="life-ring" href="https://clerk.com/support">
+Contact Clerk support for authentication issues
+</Card>
+
+<Card title="Shardly support" icon="envelope" href="mailto:support@shardly.io">
+Email us for Shardly-specific integration help
+</Card>
+</CardGroup>

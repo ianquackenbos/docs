@@ -1,0 +1,151 @@
+---
+title: Get Cost Overview
+api: GET /api/v1/costs/deployments/{deployment_id}/overview
+description: "Get cost summary for a deployment"
+---
+
+## Overview
+
+Returns a summary of costs for a specific deployment, including total spend, month-over-month change, potential savings, and active recommendations.
+
+## Request
+
+<ParamField path="deployment_id" type="string" required>
+  The unique identifier of the deployment
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X GET "https://api.shardly.io/api/v1/costs/deployments/dep-123/overview" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Response
+
+<ResponseField name="total_monthly_spend" type="number">
+  Total projected cost for the current month in USD
+</ResponseField>
+
+<ResponseField name="month_over_month_change" type="number">
+  Percentage change from previous month (positive = increase)
+</ResponseField>
+
+<ResponseField name="potential_savings" type="number">
+  Total potential savings from pending recommendations in USD
+</ResponseField>
+
+<ResponseField name="active_recommendations" type="integer">
+  Number of pending recommendations
+</ResponseField>
+
+<ResponseField name="cost_breakdown" type="object">
+  Cost breakdown by category
+</ResponseField>
+
+<ResponseField name="top_cost_drivers" type="array">
+  Top 5 indices by cost
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "total_monthly_spend": 12500.00,
+  "month_over_month_change": 8.5,
+  "potential_savings": 2060.00,
+  "active_recommendations": 12,
+  "cost_breakdown": {
+    "capacity": 8500.00,
+    "storage": 3200.00,
+    "data_transfer": 800.00
+  },
+  "top_cost_drivers": [
+    {
+      "index_pattern": "logs-prod-*",
+      "monthly_cost": 3200.00,
+      "size_bytes": 2748779069440,
+      "tier": "hot",
+      "trend": 12.5
+    },
+    {
+      "index_pattern": "metrics-*",
+      "monthly_cost": 2400.00,
+      "size_bytes": 1932735283200,
+      "tier": "hot",
+      "trend": -5.2
+    }
+  ],
+  "as_of": "2024-08-15T10:00:00Z"
+}
+```
+
+## Use Cases
+
+### Dashboard Display
+
+Display summary cards on the main dashboard:
+
+```javascript
+const { data: overview } = useCostOverview(deploymentId);
+
+return (
+  <div>
+    <Card title="Monthly Spend">
+      ${overview.total_monthly_spend.toLocaleString()}
+    </Card>
+    <Card title="vs Last Month">
+      {overview.month_over_month_change > 0 ? '+' : ''}
+      {overview.month_over_month_change}%
+    </Card>
+    <Card title="Potential Savings">
+      ${overview.potential_savings.toLocaleString()}
+    </Card>
+  </div>
+);
+```
+
+### Cost Alerting
+
+Check for cost increases:
+
+```python
+overview = get_cost_overview(deployment_id)
+
+if overview['month_over_month_change'] > 20:
+    send_alert(
+        f"Cost increase of {overview['month_over_month_change']}% detected"
+    )
+```
+
+### Reporting
+
+Generate monthly cost reports:
+
+```python
+for deployment in get_deployments():
+    overview = get_cost_overview(deployment['id'])
+    
+    report.add_row({
+        'deployment': deployment['name'],
+        'cost': overview['total_monthly_spend'],
+        'change': overview['month_over_month_change'],
+        'savings_opportunity': overview['potential_savings']
+    })
+```
+
+## Related Endpoints
+
+- [Get Cost Trend](/api-reference/costs/trend) - Historical cost data
+- [Get Cost by Tier](/api-reference/costs/by-tier) - Tier breakdown
+- [Get Index Costs](/api-reference/costs/indices) - Index-level costs
+
+## Required Permissions
+
+- `read:costs`
+
+## Rate Limits
+
+- 60 requests per minute
+- Cached for 5 minutes
+

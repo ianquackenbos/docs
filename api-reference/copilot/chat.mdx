@@ -1,0 +1,193 @@
+---
+title: Send Chat Message
+api: POST /api/v1/copilot/chat
+description: "Send a message to the AI Copilot"
+---
+
+## Overview
+
+Send a natural language message to the AI Copilot and receive an intelligent response. The Copilot has context about your deployment, costs, and recommendations.
+
+## Request
+
+<ParamField body="message" type="string" required>
+  The user's message in natural language
+</ParamField>
+
+<ParamField body="deployment_id" type="string">
+  Deployment ID for context. If not provided, uses user's default deployment.
+</ParamField>
+
+<ParamField body="conversation_id" type="string">
+  Continue an existing conversation. If not provided, starts a new conversation.
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/copilot/chat" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Why did my costs increase this month?",
+    "deployment_id": "dep-123"
+  }'
+```
+
+## Response
+
+<ResponseField name="response" type="string">
+  The Copilot's response in markdown format
+</ResponseField>
+
+<ResponseField name="conversation_id" type="string">
+  ID to continue this conversation
+</ResponseField>
+
+<ResponseField name="message_id" type="string">
+  Unique ID for this message
+</ResponseField>
+
+<ResponseField name="suggestions" type="array">
+  Suggested follow-up questions
+</ResponseField>
+
+<ResponseField name="actions" type="array">
+  Suggested actions the user can take
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "response": "Your costs increased by **8.5% ($1,062)** this month. Here's the breakdown:\n\n**Main Driver:**\n- `logs-prod-*` grew from 2.1TB to 2.5TB, adding $400 to your bill\n\n**Other Factors:**\n- `metrics-*` increased by 15% (+$180)\n- New index `events-*` added $280\n\nI found 3 recommendations that could save you **$780/month**. Would you like me to explain them?",
+  "conversation_id": "conv-789",
+  "message_id": "msg-456",
+  "suggestions": [
+    "Explain the ILM recommendation",
+    "Show me the top cost drivers",
+    "How can I reduce logs-prod costs?"
+  ],
+  "actions": [
+    {
+      "type": "view_recommendation",
+      "label": "View ILM Recommendation",
+      "recommendation_id": "rec-123"
+    },
+    {
+      "type": "view_index",
+      "label": "View logs-prod-* details",
+      "index_pattern": "logs-prod-*"
+    }
+  ]
+}
+```
+
+## Streaming Response
+
+For real-time streaming, use the SSE endpoint:
+
+```bash
+curl -N "https://api.shardly.io/api/v1/copilot/chat/stream" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Explain ILM policies"}'
+```
+
+Response is Server-Sent Events:
+
+```
+data: {"chunk": "ILM (Index Lifecycle Management) is"}
+data: {"chunk": " a feature that automatically"}
+data: {"chunk": " manages indices through their lifecycle..."}
+data: {"done": true, "conversation_id": "conv-789"}
+```
+
+## Context
+
+The Copilot automatically has access to:
+
+| Context | Description |
+|---------|-------------|
+| Current costs | Total spend, breakdown by category |
+| Cost trends | Recent changes, growth rates |
+| Top cost drivers | Most expensive indices |
+| Recommendations | Pending optimization opportunities |
+| Cluster health | Current status, issues |
+| User's organization | Settings, teams |
+
+## Example Conversations
+
+### Cost Analysis
+
+```json
+{
+  "message": "Which team is spending the most?"
+}
+```
+
+```json
+{
+  "response": "The **Frontend** team has the highest spend at **$4,200/month** (33.6% of total).\n\nBreakdown by team:\n| Team | Monthly Cost | % of Total |\n|------|-------------|------------|\n| Frontend | $4,200 | 33.6% |\n| Backend | $3,100 | 24.8% |\n| Platform | $2,800 | 22.4% |\n\nThe Frontend team's costs are primarily from `logs-frontend-*` indices."
+}
+```
+
+### Recommendation Explanation
+
+```json
+{
+  "message": "Explain the tier migration recommendation"
+}
+```
+
+```json
+{
+  "response": "This recommendation suggests moving older data from **hot** tier to **warm** tier.\n\n**The Problem:**\nYou have 450GB of data older than 30 days still on hot tier, which costs $0.15/GB.\n\n**The Solution:**\nMove this data to warm tier at $0.08/GB.\n\n**Savings:** $520/month\n**Risk:** Low - data remains searchable, just slightly slower\n\nWould you like me to show you the commands to implement this?"
+}
+```
+
+### Custom Commands
+
+```json
+{
+  "message": "Give me the command to create an ILM policy for my logs"
+}
+```
+
+```json
+{
+  "response": "Here's a recommended ILM policy for your `logs-*` indices:\n\n```json\nPUT /_ilm/policy/logs-lifecycle\n{\n  \"policy\": {\n    \"phases\": {\n      \"hot\": {\n        \"actions\": {\n          \"rollover\": { \"max_age\": \"1d\", \"max_size\": \"50gb\" }\n        }\n      },\n      \"warm\": {\n        \"min_age\": \"7d\",\n        \"actions\": {\n          \"allocate\": { \"require\": { \"data\": \"warm\" } },\n          \"forcemerge\": { \"max_num_segments\": 1 }\n        }\n      },\n      \"delete\": {\n        \"min_age\": \"90d\",\n        \"actions\": { \"delete\": {} }\n      }\n    }\n  }\n}\n```\n\n**Estimated Savings:** $780/month based on your current data volume."
+}
+```
+
+## Error Handling
+
+### Rate Limited
+
+```json
+{
+  "detail": "Too many requests. Please wait before sending another message.",
+  "status_code": 429,
+  "retry_after": 30
+}
+```
+
+### Context Not Available
+
+```json
+{
+  "detail": "Unable to load deployment context",
+  "status_code": 400
+}
+```
+
+## Required Permissions
+
+- `read:copilot`
+
+## Rate Limits
+
+- 30 requests per minute
+- 500 requests per day
+- Streaming: 10 concurrent connections
+

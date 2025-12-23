@@ -1,0 +1,306 @@
+---
+title: Team Management
+description: "Configure teams for cost attribution and access control"
+---
+
+## Overview
+
+Teams in Shardly serve two purposes:
+
+1. **Cost Attribution**: Assign costs to teams for chargeback and reporting
+2. **Access Control**: Limit what users can see and do
+
+## Creating Teams
+
+### Via Dashboard
+
+1. Navigate to **Settings → Teams**
+2. Click **Create Team**
+3. Configure:
+   - **Name**: Team display name
+   - **Slug**: URL-friendly identifier
+   - **Description**: Team description
+   - **Cost Center**: For billing/chargeback
+   - **Contact Email**: Team contact
+
+### Via API
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/teams" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Frontend Engineering",
+    "slug": "frontend",
+    "description": "Web and mobile frontend teams",
+    "cost_center": "CC-100",
+    "contact_email": "frontend@company.com"
+  }'
+```
+
+## Team Structure
+
+```yaml
+organization: Acme Corp
+├── teams:
+│   ├── Frontend
+│   │   ├── cost_center: CC-100
+│   │   ├── budget: $5,000/month
+│   │   └── members: 8
+│   │
+│   ├── Backend
+│   │   ├── cost_center: CC-200
+│   │   ├── budget: $4,000/month
+│   │   └── members: 12
+│   │
+│   └── Platform
+│       ├── cost_center: CC-300
+│       ├── budget: $3,000/month
+│       └── members: 5
+```
+
+## Team Members
+
+### Add Members
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/teams/{team_id}/members" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "user_id": "user_123",
+    "role": "member"
+  }'
+```
+
+### Member Roles
+
+| Role | Permissions |
+|------|-------------|
+| `owner` | Full team control, manage members |
+| `admin` | Manage team settings, apply recommendations |
+| `member` | View costs, apply recommendations |
+| `viewer` | View costs only |
+
+### Remove Members
+
+```bash
+curl -X DELETE "https://api.shardly.io/api/v1/teams/{team_id}/members/{user_id}" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Team Visibility
+
+### Organization-Wide Teams
+
+Default: All organization members can see all teams' costs.
+
+### Private Teams
+
+Restrict visibility:
+
+```bash
+curl -X PATCH "https://api.shardly.io/api/v1/teams/{team_id}" \
+  -d '{
+    "visibility": "private"
+  }'
+```
+
+Private teams:
+- Only team members can see costs
+- Only team members can apply recommendations
+- Organization admins can always see
+
+## Team Budgets
+
+### Set Monthly Budget
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/teams/{team_id}/budget" \
+  -d '{
+    "monthly_limit": 5000,
+    "currency": "USD",
+    "alert_thresholds": [80, 100],
+    "fiscal_year_start": "2024-01-01"
+  }'
+```
+
+### Budget Alerts
+
+Configure notifications when approaching budget:
+
+```yaml
+alerts:
+  - threshold: 80%
+    action: email
+    recipients: [team_leads]
+    
+  - threshold: 100%
+    action: slack
+    channel: #engineering-costs
+    
+  - threshold: 120%
+    action: pagerduty
+    severity: warning
+```
+
+### Budget Tracking
+
+```bash
+GET /api/v1/teams/{team_id}/budget/status
+
+# Response
+{
+  "monthly_limit": 5000,
+  "current_spend": 4200,
+  "percent_used": 84,
+  "days_remaining": 8,
+  "projected_end_of_month": 5775,
+  "on_track": false
+}
+```
+
+## Team Reports
+
+### Generate Team Report
+
+```bash
+GET /api/v1/teams/{team_id}/report?period=2024-08
+
+# Response
+{
+  "team": "Frontend",
+  "period": "2024-08",
+  "summary": {
+    "total_cost": 4200,
+    "vs_budget": -800,
+    "vs_last_month": 350,
+    "vs_last_month_percent": 9.1
+  },
+  "top_indices": [...],
+  "recommendations": [...],
+  "savings_implemented": 450
+}
+```
+
+### Export for Chargeback
+
+```bash
+GET /api/v1/reports/chargeback?period=2024-08&format=csv
+
+# Returns CSV with all teams' costs
+```
+
+## Multi-Team Assignment
+
+Indices can be attributed to multiple teams:
+
+```yaml
+# 60% Frontend, 40% Backend
+- pattern: "shared-api-*"
+  attribution:
+    - team: Frontend
+      percent: 60
+    - team: Backend
+      percent: 40
+```
+
+## Team Hierarchy
+
+For large organizations, create team hierarchies:
+
+```yaml
+organization: Acme Corp
+├── Engineering Division
+│   ├── Frontend Team
+│   │   ├── Web Team
+│   │   └── Mobile Team
+│   └── Backend Team
+│       ├── API Team
+│       └── Data Team
+└── Operations Division
+    └── Platform Team
+```
+
+### Create Hierarchy
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/teams/{parent_id}/children" \
+  -d '{
+    "name": "Web Team",
+    "slug": "web"
+  }'
+```
+
+### Roll-Up Reports
+
+Parent teams see aggregated costs from child teams:
+
+```
+Engineering Division: $7,300
+├── Frontend Team: $4,200
+│   ├── Web Team: $2,800
+│   └── Mobile Team: $1,400
+└── Backend Team: $3,100
+    ├── API Team: $1,900
+    └── Data Team: $1,200
+```
+
+## Team Settings
+
+### Notification Preferences
+
+```bash
+PATCH /api/v1/teams/{team_id}/settings
+{
+  "notifications": {
+    "weekly_summary": true,
+    "recommendation_alerts": true,
+    "budget_alerts": true,
+    "channels": {
+      "email": ["team-lead@company.com"],
+      "slack": "#team-costs"
+    }
+  }
+}
+```
+
+### Default Deployment
+
+Set the default deployment for team members:
+
+```bash
+PATCH /api/v1/teams/{team_id}/settings
+{
+  "default_deployment_id": "dep-123"
+}
+```
+
+## Best Practices
+
+### 1. Mirror Your Organization
+
+Create teams that match your actual org structure:
+- By department
+- By product
+- By service ownership
+
+### 2. Assign Clear Ownership
+
+Every team should have:
+- At least one owner
+- A contact email
+- Clear scope of responsibility
+
+### 3. Set Realistic Budgets
+
+Base budgets on:
+- Historical spending
+- Growth projections
+- Business priorities
+
+### 4. Review Regularly
+
+- Weekly: Check budget status
+- Monthly: Review team reports
+- Quarterly: Adjust budgets and structure
+

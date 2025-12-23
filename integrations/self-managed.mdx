@@ -1,0 +1,488 @@
+---
+title: Self-Managed Elasticsearch
+description: "Connect Shardly to self-managed Elasticsearch clusters"
+---
+
+## Overview
+
+Shardly supports self-managed (on-premises or self-hosted) Elasticsearch clusters in addition to Elastic Cloud. This guide covers connecting to clusters you host yourself.
+
+<Info>
+**Self-managed support status:** Generally available. Most features work identically to Elastic Cloud, with some differences in billing data collection.
+</Info>
+
+## Feature comparison
+
+| Feature | Elastic Cloud | Self-Managed |
+|---------|---------------|--------------|
+| **Index cost analysis** | ✅ Automatic | ✅ Custom pricing required |
+| **Billing data collection** | ✅ Automatic API | ⚠️ Manual entry |
+| **Recommendations** | ✅ | ✅ |
+| **Auto-apply** | ✅ | ✅ |
+| **ILM analysis** | ✅ | ✅ |
+| **Tier optimization** | ✅ | ✅ |
+| **Savings tracking** | ✅ | ✅ (with custom pricing) |
+| **AI Copilot** | ✅ | ✅ |
+
+<Tip>
+**All optimization features work on self-managed clusters!** The only difference is billing - you'll need to provide custom pricing information.
+</Tip>
+
+## Prerequisites
+
+Before connecting a self-managed cluster:
+
+- **Elasticsearch 7.10+** or **8.x** (earlier versions not supported)
+- **Network connectivity** from Shardly to your cluster  
+- **Authentication credentials** (API key recommended, basic auth supported)
+- **Firewall rules** allowing Shardly's IP addresses (see Security section)
+
+## Connecting your cluster
+
+<Steps>
+<Step title="Prepare authentication">
+
+Choose your authentication method and create credentials.
+
+<Tabs>
+<Tab title="API Key (Recommended)">
+Create a dedicated API key in Elasticsearch with read-only permissions:
+
+```bash
+POST /_security/api_key
+{
+  "name": "shardly-monitoring",
+  "role_descriptors": {
+    "shardly_reader": {
+      "cluster": ["monitor", "manage_ilm"],
+      "index": [
+        {
+          "names": ["*"],
+          "privileges": ["read", "monitor", "view_index_metadata"]
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "application": "shardly",
+    "environment": "production"
+  }
+}
+```
+
+Response:
+```json
+{
+  "id": "VuaCfGcBCdbkQm-e5aOx",
+  "name": "shardly-monitoring",
+  "api_key": "ui2lp2axTNmsyakw9tvNnw",
+  "encoded": "VnVhQ2ZHY0JDZGJrUW0tZTVhT3g6dWkybHAyYXhUTm1zeWFrdzl0dk5udw=="
+}
+```
+
+<Warning>
+**Save the `encoded` value** - it's only shown once and you'll need it for Shardly connection.
+</Warning>
+
+**Required permissions:**
+- `cluster:monitor` - Read cluster health and stats
+- `cluster:manage_ilm` - Read ILM policies (not modify)
+- `index:read` - Read index data and settings
+- `index:monitor` - Monitor index metrics
+- `index:view_index_metadata` - View index metadata
+</Tab>
+
+<Tab title="Username/Password">
+Create a dedicated user with read-only access:
+
+**Step 1: Create the role**
+```bash
+POST /_security/role/shardly_reader
+{
+  "cluster": ["monitor", "manage_ilm"],
+  "indices": [
+    {
+      "names": ["*"],
+      "privileges": ["read", "monitor", "view_index_metadata"]
+    }
+  ]
+}
+```
+
+**Step 2: Create the user**
+```bash
+POST /_security/user/shardly_monitor
+{
+  "password": "use-strong-password-here",
+  "roles": ["shardly_reader"],
+  "full_name": "Shardly Monitoring User",
+  "email": "monitoring@yourcompany.com"
+}
+```
+
+<Info>
+Use a strong, randomly generated password and store it securely (e.g., in your password manager).
+</Info>
+</Tab>
+</Tabs>
+
+<Check>
+Authentication credentials created and saved securely
+</Check>
+</Step>
+
+<Step title="Add connection in Shardly">
+
+<Tabs>
+<Tab title="Via Dashboard">
+1. Navigate to **Connections** in Shardly
+2. Click **Add Connection**
+3. Select **Self-Managed** tab
+4. Fill in the form:
+   - **Name**: Friendly name (e.g., "On-Prem Production")
+   - **Elasticsearch URL**: Your cluster endpoint (e.g., `https://es.internal.company.com:9200`)
+   - **Authentication**: Choose API Key or Username/Password
+   - **Credentials**: Paste API key (encoded value) or enter username/password
+5. Click **Test Connection**
+6. If successful, click **Add Connection**
+
+<Frame>
+<img src="/images/add-self-managed-connection.png" alt="Shardly add connection form for self-managed Elasticsearch with URL and authentication fields" />
+</Frame>
+</Tab>
+
+<Tab title="Via API">
+**With API Key:**
+```bash
+curl -X POST "https://api.shardly.io/api/v1/connections" \
+  -H "Authorization: Bearer $SHARDLY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "On-Prem Production",
+    "connection_type": "self_managed",
+    "elasticsearch_url": "https://es.internal.company.com:9200",
+    "auth_type": "api_key",
+    "api_key": "VnVhQ2ZHY0JDZGJrUW0tZTVhT3g6dWkybHAyYXhUTm1zeWFrdzl0dk5udw=="
+  }'
+```
+
+**With Username/Password:**
+```bash
+curl -X POST "https://api.shardly.io/api/v1/connections" \
+  -H "Authorization: Bearer $SHARDLY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "On-Prem Production",
+    "connection_type": "self_managed",
+    "elasticsearch_url": "https://es.internal.company.com:9200",
+    "auth_type": "basic",
+    "username": "shardly_monitor",
+    "password": "your-secure-password"
+  }'
+```
+</Tab>
+</Tabs>
+
+<Check>
+Connection test successful
+</Check>
+</Step>
+
+<Step title="Configure custom pricing (optional but recommended)">
+
+To enable cost analysis and savings tracking, provide pricing information for your self-managed cluster.
+
+1. Go to **Settings** → **Custom Pricing**
+2. Click **Add Pricing Model**
+3. Select your connection
+4. Enter costs:
+
+<CardGroup cols={2}>
+<Card title="Infrastructure costs" icon="server">
+- Node hardware/cloud costs
+- Network costs
+- Support contracts
+- Licensing fees
+</Card>
+
+<Card title="Storage costs" icon="hard-drive">
+- Hot tier: $/GB/month
+- Warm tier: $/GB/month  
+- Cold tier: $/GB/month
+- Frozen tier: $/GB/month
+</Card>
+</CardGroup>
+
+**Example pricing model:**
+```json
+{
+  "connection_id": "conn-xyz789",
+  "pricing_model": {
+    "infrastructure": {
+      "monthly_cost": 5000,
+      "node_count": 10
+    },
+    "storage_tiers": {
+      "hot": { "per_gb_month": 0.15 },
+      "warm": { "per_gb_month": 0.08 },
+      "cold": { "per_gb_month": 0.04 },
+      "frozen": { "per_gb_month": 0.01 }
+    }
+  }
+}
+```
+
+<Info>
+**Without custom pricing:** Shardly can still generate recommendations and auto-apply them, but savings will be estimated as percentages rather than dollar amounts.
+</Info>
+
+<Check>
+Pricing model configured (or skipped if not needed)
+</Check>
+</Step>
+
+<Step title="Wait for initial sync">
+
+Shardly collects data from your self-managed cluster:
+
+1. **Cluster discovery** (30 seconds) - Connect and verify access
+2. **Index metrics** (1-2 minutes) - Collect index statistics
+3. **Shard data** (1-2 minutes) - Map shard distribution
+4. **Node information** (30 seconds) - Gather node specs and utilization
+5. **ILM policies** (30 seconds) - Read lifecycle policies
+6. **Cost calculation** (1 minute) - Calculate costs (if pricing configured)
+7. **Recommendations** (2-3 minutes) - Generate optimizations
+
+<Info>
+**Total time:** 5-8 minutes for initial sync.
+</Info>
+
+<Check>
+Initial sync complete - data appears in dashboard
+</Check>
+</Step>
+</Steps>
+
+## Network and security
+
+### IP allowlisting
+
+If your Elasticsearch cluster uses IP-based access control, whitelist Shardly's IP addresses:
+
+```
+# Shardly Production IPs
+52.1.2.3/32
+52.1.2.4/32
+52.1.2.5/32
+```
+
+<Tip>
+Contact support@shardly.io for the most current IP ranges or to request dedicated IPs for your organization.
+</Tip>
+
+### TLS/SSL certificates
+
+<AccordionGroup>
+<Accordion title="Trusted CA certificates" icon="certificate">
+If your Elasticsearch uses certificates from a trusted CA (e.g., Let's Encrypt, DigiCert), no additional configuration needed.
+</Accordion>
+
+<Accordion title="Self-signed certificates" icon="lock">
+For self-signed certificates:
+
+1. Go to connection settings in Shardly
+2. Enable "Allow self-signed certificates"
+3. Optionally upload your CA certificate for verification
+
+<Warning>
+Only use "Allow self-signed" if you trust the network path to your cluster. This disables certificate validation.
+</Warning>
+</Accordion>
+
+<Accordion title="Certificate pinning" icon="thumbtack">
+For maximum security, pin your certificate:
+
+1. Get your certificate fingerprint:
+```bash
+openssl s_client -connect es.company.com:9200 < /dev/null 2>/dev/null | \
+  openssl x509 -fingerprint -noout -in /dev/stdin
+```
+
+2. Add fingerprint to Shardly connection settings
+3. Shardly will reject connections if certificate changes
+</Accordion>
+</AccordionGroup>
+
+### VPN and private connectivity
+
+<Tabs>
+<Tab title="VPN Connection">
+If your Elasticsearch is behind a VPN:
+
+1. Set up site-to-site VPN between Shardly and your network
+2. Contact support@shardly.io for VPN configuration details
+3. Use internal DNS names or private IPs in Elasticsearch URL
+</Tab>
+
+<Tab title="AWS PrivateLink">
+For Elasticsearch on AWS:
+
+1. Create VPC Endpoint Service for your Elasticsearch
+2. Share service name with Shardly support
+3. Shardly connects via PrivateLink (no internet exposure)
+</Tab>
+
+<Tab title="SSH Tunnel">
+For testing or development:
+
+```bash
+# Forward Elasticsearch through SSH tunnel
+ssh -L 9200:localhost:9200 user@bastion-host
+
+# Connect Shardly to http://localhost:9200
+```
+
+<Warning>
+SSH tunnels are not recommended for production use.
+</Warning>
+</Tab>
+</Tabs>
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="Connection test fails" icon="triangle-exclamation">
+**Symptoms:** "Failed to connect" or timeout errors
+
+**Common causes:**
+
+1. **Network connectivity**
+   - Verify Shardly IPs are whitelisted
+   - Check firewall rules allow port 9200 (or custom port)
+   - Test with curl from Shardly's perspective
+
+2. **Invalid credentials**
+   - API key: Verify encoded value is correct
+   - Username/password: Check for typos, ensure user exists
+
+3. **TLS/SSL issues**
+   - Certificate expired or invalid
+   - Hostname mismatch
+   - Self-signed cert without "Allow self-signed" enabled
+
+4. **Elasticsearch version**
+   - Shardly requires ES 7.10+ or 8.x
+   - Check version: `curl https://es.company.com:9200`
+</Accordion>
+
+<Accordion title="Connection works but no data" icon="database">
+**Symptoms:** Connection active, but indices/costs don't appear
+
+**Check permissions:**
+```bash
+# Test API key has required permissions
+GET /_security/user/_has_privileges
+{
+  "cluster": ["monitor"],
+  "index": [
+    {
+      "names": ["*"],
+      "privileges": ["read", "monitor"]
+    }
+  ]
+}
+```
+
+Should return `"has_all_requested": true`
+
+**Check Elasticsearch health:**
+```bash
+GET /_cluster/health
+```
+
+If cluster is red, Shardly may skip collection to avoid impacting cluster.
+</Accordion>
+
+<Accordion title="Costs showing as $0" icon="dollar-sign">
+**Symptoms:** Indices appear but all costs are zero
+
+**Cause:** No custom pricing model configured
+
+**Solution:**
+1. Go to **Settings** → **Custom Pricing**  
+2. Add pricing model for your connection
+3. Wait for next cost calculation cycle (runs hourly)
+
+<Info>
+Without pricing, recommendations will show percentage savings instead of dollar amounts.
+</Info>
+</Accordion>
+</AccordionGroup>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Use API keys over passwords" icon="key">
+API keys are more secure than username/password:
+- Can be scoped to specific permissions
+- Can be rotated without changing passwords
+- Can be revoked independently
+- Don't expose password in logs or configs
+</Accordion>
+
+<Accordion title="Monitor authentication" icon="shield-halved">
+Regularly review Shardly's access:
+- Check Elasticsearch audit logs for shardly_monitor user
+- Rotate API keys quarterly
+- Remove old/unused API keys
+- Alert on unusual access patterns
+</Accordion>
+
+<Accordion title="Keep pricing updated" icon="coins">
+Update your custom pricing model when:
+- Hardware costs change
+- Storage tier pricing changes
+- Node count increases/decreases
+- Support contracts renew
+
+Accurate pricing = accurate savings calculations.
+</Accordion>
+
+<Accordion title="Test in non-production first" icon="flask">
+Before connecting production:
+1. Connect development/staging cluster first
+2. Verify data collection works
+3. Test auto-apply on non-critical indices
+4. Review recommendations accuracy
+</Accordion>
+</AccordionGroup>
+
+## Limitations
+
+<Warning>
+**Self-managed limitations to be aware of:**
+
+- **Billing automation**: No automatic billing API like Elastic Cloud. You must provide custom pricing.
+- **Deployment discovery**: Only the cluster you explicitly connect (no automatic organization-wide discovery).
+- **Support matrix**: Elasticsearch 7.10+ or 8.x only. Earlier versions not supported.
+</Warning>
+
+## Next steps
+
+<CardGroup cols={2}>
+<Card title="Configure pricing" icon="dollar-sign" href="/configuration/cost-rules">
+Set up custom pricing for accurate cost analysis
+</Card>
+
+<Card title="Review recommendations" icon="lightbulb" href="/features/recommendations">
+See optimization opportunities for your cluster
+</Card>
+
+<Card title="Test auto-apply" icon="play" href="/features/auto-apply">
+Try automated optimization on development cluster
+</Card>
+
+<Card title="Set up monitoring" icon="bell" href="/configuration/teams">
+Configure alerts and team notifications
+</Card>
+</CardGroup>

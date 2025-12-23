@@ -1,0 +1,623 @@
+---
+title: Core Concepts
+description: "Understand the key concepts and terminology in Shardly"
+---
+
+## Overview
+
+This guide explains the core concepts you'll encounter when using Shardly. Understanding these terms and how they relate to each other will help you get the most value from the platform.
+
+<Tip>
+**New to Shardly?** Start with [Connections](#connections) → [Deployments](#deployments) → [Recommendations](#recommendations) to understand the basic workflow.
+</Tip>
+
+## Connections
+
+A **connection** represents the link between Shardly and your Elastic Cloud organization. It contains your encrypted API credentials and manages access to all deployments within that organization.
+
+### Connection hierarchy
+
+```
+Connection
+├── Organization ID (from Elastic Cloud)
+├── API Key (encrypted with Fernet)
+├── Status (pending, active, error)
+└── Deployments (auto-synced from Elastic Cloud)
+    ├── Deployment 1
+    ├── Deployment 2
+    └── Deployment N
+```
+
+### Connection lifecycle
+
+1. **Created** - You add organization ID and API key
+2. **Validating** - Shardly tests API access and permissions
+3. **Active** - Successfully connected, syncing deployments
+4. **Error** - Connection failed (invalid key, expired, permissions issue)
+
+<Info>
+**Multiple organizations?** You can add multiple connections if you manage separate Elastic Cloud organizations (e.g., production and development orgs).
+</Info>
+
+## Deployments
+
+A **deployment** is an Elasticsearch cluster in Elastic Cloud. Shardly discovers deployments automatically when you add a connection and tracks all cost and performance metrics for each one.
+
+### Deployment properties
+
+<AccordionGroup>
+<Accordion title="Basic information" icon="info-circle">
+- **Name** and **ID** from Elastic Cloud
+- **Region** where it's deployed (e.g., aws-us-east-1)
+- **Version** of Elasticsearch running
+- **Health status** (green, yellow, red)
+</Accordion>
+
+<Accordion title="Cost data" icon="dollar-sign">
+- **Total monthly cost** from Elastic billing API
+- **Index-level cost breakdown** calculated by Shardly
+- **Cost trends** over time (daily, weekly, monthly)
+- **Cost attribution** to teams and projects
+</Accordion>
+
+<Accordion title="Cluster metrics" icon="chart-line">
+- **Indices** count, size, and distribution
+- **Nodes** count, specs, and utilization
+- **Shards** primary and replica counts
+- **Storage** by tier (hot, warm, cold, frozen)
+</Accordion>
+</AccordionGroup>
+
+### Data collection schedule
+
+| Activity | Frequency | Purpose |
+|----------|-----------|---------|
+| **Billing sync** | Every 6 hours | Fetch latest cost data from Elastic Cloud API |
+| **Cluster metrics** | Every hour | Collect index, node, and shard statistics |
+| **Recommendation analysis** | Daily at 2 AM UTC | Run optimization detectors |
+
+<Tip>
+You can manually trigger data collection anytime by clicking **Sync Now** on a deployment.
+</Tip>
+
+## Cost allocation
+
+Shardly uses a proprietary cost allocation engine to break down deployment-level costs to individual indices. This gives you visibility that Elastic Cloud doesn't provide.
+
+<Info>
+**Why index-level costs matter:** Elastic Cloud only shows total deployment costs. Shardly tells you *which indices* are expensive so you know where to optimize.
+</Info>
+
+### How cost allocation works
+
+```
+Total Deployment Cost ($12,500/month)
+       ↓
+┌────────────────────────────────────────┐
+│      Cost Allocation Engine            │
+│                                        │
+│  Storage Cost = size × tier rate       │
+│  Shard Cost = shards × overhead        │
+│  Replica Cost = replicas × base cost   │
+└────────────────────────────────────────┘
+       ↓
+Index-Level Costs
+├── logs-prod-2024.08: $3,200/month (25.6%)
+├── metrics-*: $2,100/month (16.8%)
+├── apm-*: $1,850/month (14.8%)
+└── ... (other indices)
+```
+
+### Cost components
+
+Each index cost is calculated from multiple factors:
+
+<CardGroup cols={2}>
+<Card title="Storage cost" icon="database">
+**Calculation:** `GB × tier rate`
+
+The primary cost driver. Hot tier storage costs more than warm, which costs more than cold.
+</Card>
+
+<Card title="Shard overhead" icon="cubes">
+**Calculation:** `shard count × fixed overhead`
+
+Each shard consumes cluster resources (memory, file handles). More shards = higher overhead.
+</Card>
+
+<Card title="Replication cost" icon="copy">
+**Calculation:** `replica storage + replica overhead`
+
+Replicas increase both storage and shard overhead costs.
+</Card>
+
+<Card title="Tier multiplier" icon="layer-group">
+**Hot:** 1.0x | **Warm:** 0.5x | **Cold:** 0.25x | **Frozen:** 0.1x
+
+Tier selection dramatically impacts costs. Moving to cold tier saves 75%!
+</Card>
+</CardGroup>
+
+### Example calculation
+
+```
+Index: logs-prod-2024.08
+├── Primary size: 450 GB
+├── Replicas: 1
+├── Total storage: 900 GB (450 GB × 2)
+├── Tier: Hot (1.0x)
+├── Shards: 5 primary + 5 replica = 10 total
+│
+├── Storage cost: 900 GB × $0.10/GB = $90/day
+├── Shard overhead: 10 shards × $2/shard = $20/day
+│
+└── Total daily cost: $110/day = $3,300/month
+```
+
+<Tip>
+Moving this index to warm tier after 7 days would save ~$1,650/month (50% reduction)!
+</Tip>
+
+## Cost attribution
+
+**Cost attribution** assigns index costs to teams, projects, or business units based on index name patterns. This enables chargeback, showback, and helps teams understand their Elasticsearch spending.
+
+### Why attribution matters
+
+<AccordionGroup>
+<Accordion title="Enable chargeback/showback" icon="receipt">
+Allocate Elasticsearch costs back to the teams or departments that generate the data. Essential for accurate cloud cost accounting.
+</Accordion>
+
+<Accordion title="Drive accountability" icon="users">
+When teams can see their own costs, they're more likely to optimize. "What gets measured gets managed."
+</Accordion>
+
+<Accordion title="Identify cost trends by team" icon="chart-line">
+Track which teams' costs are growing fastest. Surface issues before they become budget problems.
+</Accordion>
+
+<Accordion title="Compare team efficiency" icon="scale-balanced">
+Benchmark costs across teams. Why does Team A spend 3x more on logs than Team B?
+</Accordion>
+</AccordionGroup>
+
+### Attribution rules
+
+You define rules that match index name patterns to teams and projects:
+
+```yaml
+rules:
+  - pattern: "logs-frontend-*"
+    team: "Frontend Engineering"
+    project: "Web Application"
+    priority: 1
+    
+  - pattern: "logs-api-*"
+    team: "Backend Engineering"
+    project: "API Platform"
+    priority: 2
+    
+  - pattern: "metrics-*"
+    team: "Platform Engineering"
+    project: "Infrastructure"
+    priority: 3
+    
+  - pattern: "*"
+    team: "Unallocated"
+    project: "General"
+    priority: 999  # Catch-all rule
+```
+
+<Info>
+**Rule evaluation:** Rules are evaluated in priority order (lowest first). The first matching rule wins. Use specific patterns before wildcards.
+</Info>
+
+### Unattributed costs
+
+Indices that don't match any attribution rule are marked as **unattributed**. You should aim for 95%+ attribution coverage.
+
+<Warning>
+High unattributed costs indicate your rules don't cover all indices. Review unattributed indices regularly and add rules to categorize them.
+</Warning>
+
+<Tip>
+Add a catch-all rule with pattern `*` and low priority to assign unmatched indices to a default team.
+</Tip>
+
+## Recommendations
+
+A **recommendation** is an optimization suggestion generated by Shardly's detection engine. Each recommendation includes estimated savings, implementation steps, and can be applied automatically.
+
+### Recommendation types
+
+Shardly runs six specialized detectors to identify optimization opportunities:
+
+| Type | What it detects | Typical savings |
+|------|-----------------|-----------------|
+| **ILM Optimization** | Indices without lifecycle policies | 20-60% |
+| **Tier Migration** | Old data on expensive tiers | 30-70% |
+| **Shard Reduction** | Over-sharded indices | 10-30% |
+| **Replica Reduction** | Excessive replication | 10-50% |
+| **Shard Size Optimization** | Shards that are too large/small | 10-25% |
+| **Node Downsizing** | Underutilized infrastructure | 15-40% |
+
+<Tip>
+See [Recommendations](/features/recommendations) for detailed information on each detector type.
+</Tip>
+
+### Recommendation properties
+
+Every recommendation includes detailed metadata to help you make informed decisions:
+
+<AccordionGroup>
+<Accordion title="Impact assessment" icon="chart-line">
+- **Estimated monthly savings** - Dollar amount you'll save
+- **Risk level** - Low, medium, or high
+- **Estimated effort** - Time required to implement
+- **Affected indices** - Which indices will change
+- **Affected storage** - How much data is involved
+</Accordion>
+
+<Accordion title="Implementation details" icon="list-check">
+- **Runbook steps** - Step-by-step implementation guide
+- **ES commands** - Exact Elasticsearch API calls
+- **Rollback steps** - How to revert if needed
+- **Validation checks** - Pre-flight safety checks
+</Accordion>
+
+<Accordion title="Status tracking" icon="flag">
+- **Pending** - Not yet implemented
+- **Implemented** - Applied and tracking savings
+- **Dismissed** - User chose not to implement
+- **Snoozed** - Hidden for 30/60/90 days
+- **Verified** - Savings confirmed after 7 days
+</Accordion>
+</AccordionGroup>
+
+### Recommendation lifecycle
+
+```
+┌──────────┐
+│ Detected │ - Detector identifies optimization opportunity
+└────┬─────┘
+     ↓
+┌──────────┐
+│ Pending  │ - Recommendation appears in your dashboard
+└────┬─────┘
+     ↓
+[User Action]
+     ├────────────┬─────────────┬──────────────┐
+     ↓            ↓             ↓              ↓
+┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Implemented ││ Dismissed ││ Snoozed  ││  Expired │
+└────┬─────┘ └──────────┘ └──────────┘ └──────────┘
+     ↓
+┌──────────────┐
+│   Tracking   │ - Monitoring savings for 7 days
+└────┬─────────┘
+     ↓
+┌──────────────┐
+│   Verified   │ - Savings confirmed ✓
+└──────────────┘
+```
+
+<Info>
+**Auto-verification:** After you implement a recommendation, Shardly automatically tracks its impact for 7 days and verifies the actual savings match the estimate.
+</Info>
+
+## Runbooks
+
+A **runbook** is a step-by-step implementation guide for a recommendation. Shardly automatically generates runbooks with exact Elasticsearch commands, expected outcomes, and safety warnings.
+
+### Runbook components
+
+Each runbook step includes:
+
+<CardGroup cols={2}>
+<Card title="Title & description" icon="heading">
+Clear explanation of what this step does and why it's necessary.
+</Card>
+
+<Card title="ES command" icon="terminal">
+Exact Elasticsearch API call with method, path, and request body.
+</Card>
+
+<Card title="Expected result" icon="check">
+What you should see when the command succeeds.
+</Card>
+
+<Card title="Safety warning" icon="triangle-exclamation">
+Potential issues or things to be aware of (if applicable).
+</Card>
+</CardGroup>
+
+### Example runbook step
+
+Here's a typical step from an ILM optimization runbook:
+
+```json
+{
+  "order": 1,
+  "title": "Create ILM policy",
+  "description": "Create a lifecycle policy that moves data through hot → warm → cold → delete phases based on age",
+  "action_type": "es_api",
+  "es_command": {
+    "method": "PUT",
+    "path": "/_ilm/policy/shardly-optimized-logs",
+    "body": {
+      "policy": {
+        "phases": {
+          "hot": {
+            "actions": {
+              "rollover": {
+                "max_size": "50GB",
+                "max_age": "1d"
+              }
+            }
+          },
+          "warm": {
+            "min_age": "7d",
+            "actions": {
+              "allocate": {
+                "require": {
+                  "data": "warm"
+                }
+              }
+            }
+          },
+          "cold": {
+            "min_age": "30d",
+            "actions": {
+              "allocate": {
+                "require": {
+                  "data": "cold"
+                }
+              }
+            }
+          },
+          "delete": {
+            "min_age": "90d",
+            "actions": {
+              "delete": {}
+            }
+          }
+        }
+      }
+    }
+  },
+  "expected_result": "Policy created successfully - you should see {\"acknowledged\": true}",
+  "warning": "Adjust retention periods (7d, 30d, 90d) based on your compliance and business requirements",
+  "estimated_time": "2 minutes"
+}
+```
+
+<Tip>
+**Use auto-apply:** Instead of manually executing runbook steps, use Shardly's [auto-apply feature](/features/auto-apply) to execute all steps automatically with safety checks.
+</Tip>
+
+## Execution
+
+An **execution** is the automated process of applying a recommendation to your Elasticsearch cluster. This is Shard ly's unique capability - no other tool can programmatically apply Elasticsearch optimizations.
+
+<Warning>
+**Elastic AutoOps has no API.** Shardly is the only tool that can automatically execute Elasticsearch optimizations.
+</Warning>
+
+### Execution flow
+
+When you click **Apply Now** on a recommendation:
+
+```
+Start Execution
+       ↓
+┌─────────────────┐
+│   Validation    │  ← Pre-flight safety checks
+└─────────────────┘
+       ↓ Pass
+┌─────────────────┐
+│ Capture Before  │  ← Snapshot current cluster state
+└─────────────────┘
+       ↓
+┌─────────────────┐
+│ Execute Steps   │  ← Run ES commands from runbook
+└─────────────────┘
+       ↓
+┌─────────────────┐
+│ Capture After   │  ← Snapshot new cluster state
+└─────────────────┘
+       ↓
+┌─────────────────┐
+│ Track Change    │  ← Record for savings verification
+└─────────────────┘
+       ↓
+    Complete
+```
+
+### Execution states
+
+Track execution progress through these states:
+
+| State | Description | What happens next |
+|-------|-------------|-------------------|
+| `pending` | Queued, waiting to start | Execution will begin shortly |
+| `validating` | Running pre-flight checks | Proceeds to in_progress if checks pass |
+| `in_progress` | Executing runbook steps | Monitor progress, wait for completion |
+| `completed` | Successfully finished | Savings tracking begins automatically |
+| `failed` | Error occurred during execution | Review error, consider rollback |
+| `rolled_back` | Changes were reverted | Investigate cause, fix issues, retry |
+
+<Info>
+**Real-time tracking:** Poll the `/execution/{id}/status` API endpoint to track progress. Updates every 1-2 seconds during execution.
+</Info>
+
+## Tracked changes
+
+A **tracked change** records an implemented optimization for savings verification. Shardly automatically tracks every applied recommendation to prove ROI.
+
+### Why tracking matters
+
+<AccordionGroup>
+<Accordion title="Prove ROI to stakeholders" icon="chart-pie">
+Show executives and finance teams exactly how much you're saving. Hard numbers, not estimates.
+</Accordion>
+
+<Accordion title="Validate estimation accuracy" icon="bullseye">
+Verify that Shardly's savings estimates are accurate. Build confidence in recommendations.
+</Accordion>
+
+<Accordion title="Identify what works best" icon="ranking-star">
+See which optimization types deliver the best results for your environment.
+</Accordion>
+
+<Accordion title="Build optimization history" icon="clock-rotate-left">
+Maintain a complete audit trail of all changes made to your clusters.
+</Accordion>
+</AccordionGroup>
+
+### Verification process
+
+After you apply a recommendation:
+
+1. **Day 0**: Before snapshot captured
+2. **Days 1-7**: Shardly monitors costs daily
+3. **Day 7**: After snapshot captured, actual savings calculated
+4. **Verification**: Compare actual vs. estimated savings
+5. **Confidence score**: How certain we are (0-100%)
+
+### Tracked change data
+
+```typescript
+interface TrackedChange {
+  id: string;
+  recommendation_id: string;
+  
+  // Attribution
+  implemented_at: Date;
+  implemented_by: string;  // User who applied it
+  notes: string;           // Optional context
+  
+  // Before/after comparison
+  before_snapshot: {
+    total_cost: number;
+    affected_indices_cost: number;
+    storage_bytes: number;
+  };
+  after_snapshot: {
+    total_cost: number;
+    affected_indices_cost: number;
+    storage_bytes: number;
+  };
+  
+  // Savings
+  estimated_monthly_savings: number;
+  actual_monthly_savings: number;     // Measured after 7 days
+  savings_variance_percent: number;   // How close to estimate
+  confidence_score: number;           // 0-100%
+  
+  verified_at: Date;
+  status: "tracking" | "verified" | "variance";
+}
+```
+
+<Info>
+**High variance?** If actual savings differ significantly from estimates (>20%), Shardly flags it for review and refines future estimates.
+</Info>
+
+## Copilot
+
+The **Copilot** is an AI-powered assistant (Claude Sonnet 4) that helps you understand costs, explain recommendations, and generate custom optimization strategies.
+
+### Copilot capabilities
+
+<CardGroup cols={2}>
+<Card title="Cost analysis" icon="magnifying-glass-dollar">
+Ask why costs increased, what's driving spend, or how to reduce specific indices.
+</Card>
+
+<Card title="Explain recommendations" icon="lightbulb">
+Get plain-language explanations of technical recommendations and their impact.
+</Card>
+
+<Card title="Generate strategies" icon="wand-magic-sparkles">
+Request custom optimization plans based on your specific goals and constraints.
+</Card>
+
+<Card title="ES commands" icon="terminal">
+Get Elasticsearch commands with full context and explanations of what they do.
+</Card>
+</CardGroup>
+
+### Context awareness
+
+The Copilot has full access to your Shardly data:
+
+- Current and historical deployment costs
+- Top cost drivers (indices, teams, projects)
+- Active and past recommendations
+- Recent cost trends and anomalies
+- Your organization's attribution rules
+- Tracked changes and verified savings
+
+<Tip>
+**The Copilot gets smarter over time** as it learns your organization's patterns and preferences.
+</Tip>
+
+### Example conversation
+
+<AccordionGroup>
+<Accordion title='User: "Why did my costs increase this month?"'>
+**Copilot**: "Your costs increased by 8.5% ($1,062) this month. The main driver is the `logs-prod-*` index pattern, which grew from 2.1TB to 2.5TB (+400GB). This alone accounts for $400 of the increase.
+
+I see you have a pending ILM recommendation (#47) that would add lifecycle policies to these indices, moving data to warm tier after 7 days and cold tier after 30 days. Implementing this would save approximately $780/month going forward.
+
+Would you like me to explain how to apply this recommendation?"
+</Accordion>
+
+<Accordion title='User: "How can I reduce costs on my metrics indices?"'>
+**Copilot**: "I analyzed your metrics indices and found three optimization opportunities:
+
+1. **Reduce replica count** (metrics-* indices)
+   - Current: 2 replicas
+   - Recommended: 1 replica
+   - Savings: ~$340/month
+   - Risk: Low (still has redundancy)
+
+2. **Implement ILM policy** (metrics-* indices)
+   - Move to warm tier after 14 days
+   - Move to cold tier after 60 days
+   - Delete after 180 days
+   - Savings: ~$520/month
+
+3. **Optimize shard count** (metrics-* indices)
+   - Current: 5 shards per index (oversized)
+   - Recommended: 2 shards
+   - Savings: ~$180/month
+
+**Total potential savings: $1,040/month**
+
+I can generate recommendations for these if you'd like. Which would you like to tackle first?"
+</Accordion>
+</AccordionGroup>
+
+## Data retention
+
+Shardly stores historical data for trend analysis, compliance, and long-term optimization tracking:
+
+| Data type | Retention period | Why |
+|-----------|------------------|-----|
+| **Billing snapshots** | 12+ months | Cost trend analysis, YoY comparisons |
+| **Index cost snapshots** | 12+ months | Track cost history per index |
+| **Node/shard snapshots** | 90 days | Cluster health monitoring |
+| **Recommendations** | Indefinite | Complete optimization history |
+| **Tracked changes** | Indefinite | ROI verification, audit trail |
+| **Copilot conversations** | 90 days | Privacy compliance |
+
+<Info>
+**Storage optimization:** Shardly uses TimescaleDB's automatic compression to reduce storage costs while maintaining fast query performance on historical data.
+</Info>
+
+<Tip>
+Need longer retention? Contact support about custom retention policies for compliance requirements.
+</Tip>
+

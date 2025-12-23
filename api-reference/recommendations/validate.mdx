@@ -1,0 +1,223 @@
+---
+title: Validate Recommendation
+api: POST /api/v1/recommendations/{recommendation_id}/validate
+description: "Run pre-flight validation before applying a recommendation"
+---
+
+## Overview
+
+Run pre-flight checks to verify a recommendation can be safely applied. This is a **dry-run** that doesn't make any changes.
+
+## Request
+
+<ParamField path="recommendation_id" type="string" required>
+  The unique identifier of the recommendation to validate
+</ParamField>
+
+### Example Request
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-123/validate" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+## Response
+
+<ResponseField name="can_proceed" type="boolean">
+  Whether the recommendation can be safely applied
+</ResponseField>
+
+<ResponseField name="checks" type="array">
+  List of validation checks that were run
+</ResponseField>
+
+<ResponseField name="warnings" type="array">
+  Non-blocking issues to be aware of
+</ResponseField>
+
+<ResponseField name="errors" type="array">
+  Blocking issues that prevent application
+</ResponseField>
+
+<ResponseField name="cluster_health" type="string">
+  Current cluster health status (green, yellow, red)
+</ResponseField>
+
+<ResponseField name="estimated_impact" type="object">
+  Estimated impact of applying this recommendation
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "can_proceed": true,
+  "checks": [
+    {
+      "name": "Cluster Health",
+      "status": "passed",
+      "message": "Cluster is healthy (green)",
+      "details": {
+        "status": "green",
+        "nodes": 6
+      },
+      "blocking": false
+    },
+    {
+      "name": "Target Indices",
+      "status": "passed",
+      "message": "All target indices exist",
+      "details": {
+        "checked": ["logs-prod-*"]
+      },
+      "blocking": false
+    },
+    {
+      "name": "Conflicting Operations",
+      "status": "passed",
+      "message": "No conflicting operations in progress",
+      "blocking": false
+    },
+    {
+      "name": "Disk Space",
+      "status": "warning",
+      "message": "1 node has >85% disk usage",
+      "details": {
+        "nodes": [
+          {"node": "hot-1", "used_percent": 87.2}
+        ]
+      },
+      "blocking": false
+    }
+  ],
+  "warnings": [
+    "1 node has >85% disk usage"
+  ],
+  "errors": [],
+  "cluster_health": "green",
+  "estimated_impact": {
+    "affected_indices_count": 23,
+    "estimated_savings_monthly": 780,
+    "risk_level": "low",
+    "estimated_effort": "medium",
+    "affected_storage_bytes": 2251799813685248,
+    "affected_docs_count": 450000000
+  }
+}
+```
+
+## Validation Checks
+
+### Cluster Health
+
+| Status | Result |
+|--------|--------|
+| Green | ✅ Passed |
+| Yellow | ⚠️ Warning (can proceed) |
+| Red | ❌ Failed (blocking) |
+
+### Target Indices
+
+Verifies all indices mentioned in the recommendation exist.
+
+### Conflicting Operations
+
+Checks for:
+- Reindex operations
+- Shrink operations
+- Force merge operations
+- Shard relocations
+
+### Disk Space
+
+Warns if any node exceeds 85% disk usage.
+
+### Recommendation-Specific
+
+Additional checks based on type:
+
+| Type | Additional Checks |
+|------|-------------------|
+| `ilm_optimization` | ILM enabled on cluster |
+| `tier_migration` | Target tier nodes exist |
+| `replica_reduction` | Cluster can tolerate reduced redundancy |
+
+## Check Status Values
+
+| Status | Meaning |
+|--------|---------|
+| `passed` | Check passed |
+| `warning` | Non-blocking issue |
+| `failed` | Blocking issue |
+
+## Use Cases
+
+### CI/CD Integration
+
+Validate before auto-applying:
+
+```python
+validation = validate_recommendation(rec_id)
+
+if validation['can_proceed']:
+    apply_recommendation(rec_id)
+else:
+    print(f"Cannot proceed: {validation['errors']}")
+    exit(1)
+```
+
+### Preview Before Manual Apply
+
+Show users what will happen:
+
+```python
+validation = validate_recommendation(rec_id)
+
+print("Cluster Health:", validation['cluster_health'])
+print("Can Proceed:", validation['can_proceed'])
+
+for check in validation['checks']:
+    status = "✅" if check['status'] == 'passed' else "⚠️" if check['status'] == 'warning' else "❌"
+    print(f"{status} {check['name']}: {check['message']}")
+```
+
+### Scheduled Validation
+
+Check if recommendations are still valid:
+
+```python
+for rec in get_recommendations(status='pending'):
+    validation = validate_recommendation(rec['id'])
+    
+    if not validation['can_proceed']:
+        alert(f"Recommendation {rec['id']} can no longer be applied")
+```
+
+## Error Responses
+
+### Recommendation Not Found
+
+```json
+{
+  "detail": "Recommendation not found",
+  "status_code": 404
+}
+```
+
+### Connection Error
+
+```json
+{
+  "detail": "Failed to connect to Elasticsearch cluster",
+  "status_code": 500
+}
+```
+
+## Required Permissions
+
+- `read:recommendations`
+
+## Rate Limits
+
+- 60 requests per minute
+

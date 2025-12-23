@@ -1,0 +1,484 @@
+---
+title: AI Copilot
+description: "Get instant answers about your Elasticsearch costs with AI assistance"
+---
+
+## Overview
+
+Shardly's AI Copilot is your intelligent assistant for Elasticsearch cost optimization. Powered by Claude Sonnet 4, it answers questions, explains recommendations, and generates custom optimization strategies - all in natural language.
+
+<Frame>
+  <img src="/images/copilot-chat.png" alt="AI Copilot chat interface showing a conversation about cost increases with detailed analysis and recommendations" />
+</Frame>
+
+<Tip>
+**Context-aware AI:** The Copilot has full access to your deployment data, costs, recommendations, and trends. It provides specific answers, not generic advice.
+</Tip>
+
+## Accessing the Copilot
+
+Click the **chat bubble icon** (💬) in the bottom-right corner of any page to open the Copilot drawer.
+
+The Copilot maintains context awareness of:
+- Your current deployment
+- Recent cost trends and anomalies
+- Active recommendations
+- Index and tier distribution
+- Your organization's attribution rules
+
+<Info>
+**Conversations are remembered** for 90 days, so you can continue discussions across sessions.
+</Info>
+
+## What you can ask
+
+### Cost analysis questions
+
+<AccordionGroup>
+  <Accordion title='"Why did my costs increase this month?"'>
+    **Example conversation:**
+    
+    > **You:** Why did my costs increase this month?
+    
+    > **Copilot:** Your costs increased by 8.5% ($1,062) this month. Let me break down the main drivers:
+    >
+    > **Primary Cause:**
+    > - `logs-prod-*` pattern grew from 2.1TB to 2.5TB (+400GB)
+    > - This alone accounts for $400 of the increase
+    > - Growth rate: 19% month-over-month
+    >
+    > **Secondary Factors:**
+    > - `metrics-*` grew 15% → +$180
+    > - New index `events-*` launched → +$280
+    > - `traces-*` replica added → +$120
+    >
+    > **Recommendation:**
+    > You have a pending ILM recommendation (#47) that would move logs-prod-* data to warm tier after 7 days, saving ~$780/month going forward.
+    >
+    > Would you like me to explain how to apply this recommendation?
+  </Accordion>
+  
+  <Accordion title='"Which indices cost the most?"'>
+    **Example conversation:**
+    
+    > **You:** What are my most expensive indices?
+    
+    > **Copilot:** Here are your top 5 cost drivers:
+    >
+    > | Index Pattern | Size | Tier | Monthly Cost | % of Total |
+    > |---------------|------|------|--------------|------------|
+    > | logs-prod-* | 2.5TB | hot | $3,200 | 25.6% |
+    > | metrics-* | 1.8TB | hot | $2,400 | 19.2% |
+    > | traces-* | 950GB | warm | $850 | 6.8% |
+    > | audit-* | 750GB | warm | $680 | 5.4% |
+    > | security-* | 500GB | hot | $650 | 5.2% |
+    >
+    > Together, these 5 index patterns account for **62.2%** of your total spending ($12,500/month).
+    >
+    > **Optimization potential:** I see 3 recommendations that would reduce costs on these indices by $1,420/month. Would you like details?
+  </Accordion>
+  
+  <Accordion title='"How much does team X spend?"'>
+    **Example conversation:**
+    
+    > **You:** How much is the frontend team spending?
+    
+    > **Copilot:** The Frontend team is spending **$4,200/month**, which is 33.6% of your total Elasticsearch costs.
+    >
+    > **Breakdown by index pattern:**
+    > - `logs-frontend-*`: $2,800 (66.7%)
+    > - `traces-frontend-*`: $980 (23.3%)
+    > - `metrics-frontend-*`: $420 (10.0%)
+    >
+    > **Trend:** Up 8% from last month, primarily due to increased logging volume from the new feature rollout.
+    >
+    > **Cost per engineer:** With 12 frontend engineers, that's ~$350/month per person.
+    >
+    > **Comparison:** The Backend team (14 engineers) spends $3,100/month ($221/engineer), so Frontend has 58% higher per-capita costs.
+    >
+    > Would you like suggestions on how to reduce frontend logging costs?
+  </Accordion>
+  
+  <Accordion title='"Show me cost trends"'>
+    **Example conversation:**
+    
+    > **You:** What's the trend for my costs over the past 3 months?
+    
+    > **Copilot:** Here's your 3-month cost trend:
+    >
+    > ```
+    > Month         Cost      Change
+    > ─────────────────────────────────
+    > June 2024    $11,240   Baseline
+    > July 2024    $11,890   +5.8%
+    > August 2024  $12,500   +5.1%
+    > ─────────────────────────────────
+    > Total growth: +11.2% ($1,260/month)
+    > ```
+    >
+    > **Key trends:**
+    > 1. Steady growth of 5-6% per month
+    > 2. Main driver: logs-prod-* growing 15%/month
+    > 3. If this continues, you'll hit $14,000/month by October
+    >
+    > **Projected annual cost:** $163,000 (vs $135,000 current run rate)
+    >
+    > I recommend implementing the 4 pending ILM recommendations to reduce this trajectory by $2,060/month.
+  </Accordion>
+</AccordionGroup>
+
+### Optimization advice
+
+<AccordionGroup>
+  <Accordion title='"How can I save money?"'>
+    **Example conversation:**
+    
+    > **You:** How can I reduce my Elasticsearch costs?
+    
+    > **Copilot:** Based on your current setup, I've identified several optimization opportunities. Let me categorize them by effort and impact:
+    >
+    > **🚀 Quick Wins (Low Risk, High Impact):**
+    >
+    > 1. **Add ILM policies** to 23 indices
+    >    - Effort: Low (30 mins)
+    >    - Risk: Low
+    >    - Savings: **$780/month**
+    >    - Apply: Use auto-apply on Recommendation #47
+    >
+    > 2. **Reduce replicas** on archive indices
+    >    - Effort: Low (15 mins)
+    >    - Risk: Low (still maintains 1 replica)
+    >    - Savings: **$420/month**
+    >    - Apply: Recommendation #51
+    >
+    > **📈 Medium Term (Requires Review):**
+    >
+    > 3. **Migrate old data** to warm tier
+    >    - Effort: Medium (2 hours)
+    >    - Risk: Medium (test queries first)
+    >    - Savings: **$520/month**
+    >
+    > 4. **Optimize shard counts**
+    >    - Effort: Medium (requires reindex)
+    >    - Risk: Medium (plan maintenance window)
+    >    - Savings: **$340/month**
+    >
+    > **💡 Total Potential Savings: $2,060/month (16.5% reduction)**
+    >
+    > I recommend starting with items 1 and 2 this week. Would you like me to explain how to apply them?
+  </Accordion>
+  
+  <Accordion title='"Explain this recommendation"'>
+    **Example conversation:**
+    
+    > **You:** Can you explain recommendation #47?
+    
+    > **Copilot:** Sure! Recommendation #47 is an **ILM Policy Optimization** for your logs-prod-* indices.
+    >
+    > **What's the problem?**
+    > You have 23 indices in the logs-prod-* pattern totaling 2.1TB, all sitting on the hot tier indefinitely. Hot tier is the most expensive storage (1.0x cost).
+    >
+    > **What will this do?**
+    > The recommendation will create an ILM policy that automatically:
+    > 1. Keep new data on hot tier (days 0-7)
+    > 2. Move to warm tier (50% cheaper) after 7 days
+    > 3. Move to cold tier (75% cheaper) after 30 days
+    > 4. Delete data after 90 days
+    >
+    > **Why does this save money?**
+    > Most of your log data is older than 7 days and rarely queried. By moving it to cheaper tiers, you reduce storage costs without impacting query performance for recent data.
+    >
+    > **Estimated savings: $780/month**
+    >
+    > **Is it safe?**
+    > Yes! This is a low-risk change because:
+    > - Hot tier still has your recent data
+    > - Warm/cold tier queries work the same, just slightly slower
+    > - You can rollback if needed
+    > - Shardly validates cluster health before applying
+    >
+    > Would you like me to show you the exact Elasticsearch commands that will be executed?
+  </Accordion>
+  
+  <Accordion title='"Generate a custom optimization plan"'>
+    **Example conversation:**
+    
+    > **You:** I need to cut costs by 20% by end of quarter. What should I do?
+    
+    > **Copilot:** Let me create a phased optimization plan to achieve your 20% cost reduction ($2,500/month) by end of Q3.
+    >
+    > **Phase 1: Week 1 (Low Risk, $1,200/month savings)**
+    >
+    > 1. Apply ILM policies to logs-prod-* → $780/month
+    >    - Risk: Low
+    >    - Time: 30 minutes
+    >    - Use auto-apply
+    >
+    > 2. Reduce replicas on archive indices → $420/month
+    >    - Risk: Low
+    >    - Time: 15 minutes
+    >    - Maintain 1 replica for redundancy
+    >
+    > **Phase 2: Week 2 (Medium Risk, $800/month savings)**
+    >
+    > 3. Migrate metrics-* to warm tier → $520/month
+    >    - Risk: Medium
+    >    - Time: 2 hours
+    >    - Test queries in staging first
+    >
+    > 4. Optimize shard counts on logs-api-* → $280/month
+    >    - Risk: Medium
+    >    - Time: 3 hours
+    >    - Requires reindex, plan maintenance window
+    >
+    > **Phase 3: Week 3 (Review & Adjust, $600/month savings)**
+    >
+    > 5. Downsize underutilized nodes → $600/month
+    >    - Risk: Medium-High
+    >    - Time: 4 hours
+    >    - Monitor CPU/memory after
+    >
+    > **Total Savings: $2,600/month (20.8% reduction) ✓**
+    >
+    > **Timeline:** 3 weeks to implement and verify
+    > **Confidence:** High (all recommendations are pre-validated)
+    >
+    > I recommend starting Phase 1 this week. Once verified (7 days), move to Phase 2. Would you like me to create tracking tickets for each phase?
+  </Accordion>
+</AccordionGroup>
+
+### Technical assistance
+
+<AccordionGroup>
+  <Accordion title='"Show me the Elasticsearch commands"'>
+    **Example conversation:**
+    
+    > **You:** Show me the exact ES commands for recommendation #47
+    
+    > **Copilot:** Here are the Elasticsearch commands that will be executed for recommendation #47:
+    >
+    > **Step 1: Create ILM Policy**
+    > ```json
+    > PUT /_ilm/policy/shardly-optimized-logs
+    > {
+    >   "policy": {
+    >     "phases": {
+    >       "hot": {
+    >         "actions": {
+    >           "rollover": {
+    >             "max_size": "50GB",
+    >             "max_age": "1d"
+    >           }
+    >         }
+    >       },
+    >       "warm": {
+    >         "min_age": "7d",
+    >         "actions": {
+    >           "allocate": {
+    >             "require": { "data": "warm" }
+    >           }
+    >         }
+    >       },
+    >       "cold": {
+    >         "min_age": "30d",
+    >         "actions": {
+    >           "allocate": {
+    >             "require": { "data": "cold" }
+    >           }
+    >         }
+    >       },
+    >       "delete": {
+    >         "min_age": "90d",
+    >         "actions": {
+    >           "delete": {}
+    >         }
+    >       }
+    >     }
+    >   }
+    > }
+    > ```
+    >
+    > **Step 2: Update Index Template**
+    > ```json
+    > PUT /_index_template/logs-prod-template
+    > {
+    >   "index_patterns": ["logs-prod-*"],
+    >   "template": {
+    >     "settings": {
+    >       "index.lifecycle.name": "shardly-optimized-logs"
+    >     }
+    >   }
+    > }
+    > ```
+    >
+    > **Step 3: Apply to Existing Indices**
+    > ```json
+    > POST /logs-prod-*/_settings
+    > {
+    >   "index.lifecycle.name": "shardly-optimized-logs"
+    > }
+    > ```
+    >
+    > **What each step does:**
+    > - Step 1: Creates the ILM policy with hot→warm→cold→delete phases
+    > - Step 2: Ensures new logs-prod-* indices automatically use this policy
+    > - Step 3: Applies the policy to all existing logs-prod-* indices
+    >
+    > **Want to apply manually?** Copy these commands to Kibana Dev Tools.
+    > **Want automatic application?** Use Shardly's auto-apply feature (validates + executes + tracks savings).
+  </Accordion>
+  
+  <Accordion title='"Troubleshoot an issue"'>
+    **Example conversation:**
+    
+    > **You:** My cluster is yellow, what should I check?
+    
+    > **Copilot:** A yellow cluster status means you have unassigned replica shards. Let me help you diagnose this:
+    >
+    > **Immediate diagnostic commands:**
+    > ```bash
+    > # Check which indices have unassigned shards
+    > GET /_cat/indices?v&h=index,health,pri,rep&s=health
+    >
+    > # See why shards are unassigned
+    > GET /_cluster/allocation/explain
+    > ```
+    >
+    > **Common causes:**
+    >
+    > 1. **Not enough nodes** for replica count
+    >    - Fix: Add nodes or reduce replicas
+    >    - Command: `PUT /index-name/_settings {"number_of_replicas": 1}`
+    >
+    > 2. **Shard allocation filtering** preventing allocation
+    >    - Fix: Check and adjust allocation rules
+    >    - Command: `GET /_cluster/settings?include_defaults=true&filter_path=*.cluster.routing.allocation.*`
+    >
+    > 3. **Disk space thresholds** reached
+    >    - Fix: Add storage or delete old data
+    >    - Check: `GET /_cat/allocation?v`
+    >
+    > Based on your current cluster (3 nodes, 85% disk usage on node-01), I suspect it's #3 - disk space.
+    >
+    > Would you like me to show you commands to free up space?
+  </Accordion>
+</AccordionGroup>
+
+## Copilot capabilities
+
+The Copilot can help with:
+
+<CardGroup cols={2}>
+<Card title="Cost analysis" icon="magnifying-glass-dollar">
+- Why costs changed
+- What's driving spend
+- Team/project breakdowns
+- Trend analysis
+</Card>
+
+<Card title="Explain recommendations" icon="lightbulb">
+- Plain-language explanations
+- Risk assessment
+- Implementation steps
+- Expected outcomes
+</Card>
+
+<Card title="Generate strategies" icon="wand-magic-sparkles">
+- Custom optimization plans
+- Budget-based recommendations
+- Phased rollout strategies
+- Risk-adjusted approaches
+</Card>
+
+<Card title="Technical support" icon="terminal">
+- Elasticsearch commands
+- Troubleshooting guidance
+- Best practices
+- Query optimization
+</Card>
+</CardGroup>
+
+## Context awareness
+
+The Copilot has full access to your organization's Shardly data:
+
+<AccordionGroup>
+<Accordion title="Current state" icon="gauge">
+- Real-time deployment costs
+- Index sizes and distributions
+- Node utilization
+- Shard allocation
+</Accordion>
+
+<Accordion title="Historical data" icon="clock-rotate-left">
+- Cost trends (12+ months)
+- Growth patterns
+- Seasonal variations
+- Anomaly history
+</Accordion>
+
+<Accordion title="Recommendations" icon="clipboard-list">
+- Active recommendations
+- Implementation history
+- Verified savings
+- Risk assessments
+</Accordion>
+
+<Accordion title="Configuration" icon="sliders">
+- Attribution rules
+- Team structures
+- Alert thresholds
+- Custom settings
+</Accordion>
+</AccordionGroup>
+
+<Tip>
+**The more you use it, the better it gets.** The Copilot learns your organization's patterns, preferences, and terminology over time.
+</Tip>
+
+## Best practices
+
+<AccordionGroup>
+<Accordion title="Be specific in questions" icon="crosshairs">
+**Good:** "Why did logs-prod-* costs increase last week?"
+**Bad:** "Costs went up"
+
+Specific questions get specific, actionable answers.
+</Accordion>
+
+<Accordion title="Use follow-up questions" icon="comments">
+Conversations are remembered. Ask follow-ups like:
+- "Can you show me the commands for that?"
+- "What's the risk if I apply this?"
+- "How long will it take to implement?"
+</Accordion>
+
+<Accordion title="Request custom strategies" icon="list-check">
+Tell the Copilot your goals:
+- "I need to cut 15% by end of month"
+- "Show me low-risk optimizations only"
+- "What can I do in under 1 hour?"
+</Accordion>
+
+<Accordion title="Verify before executing" icon="shield-check">
+The Copilot provides guidance, but always:
+- Review recommendations carefully
+- Test in non-production first (if possible)
+- Use Shardly's validation features
+- Have a rollback plan
+</Accordion>
+</AccordionGroup>
+
+## Privacy and security
+
+<Info>
+**Your data stays secure:**
+- Conversations are encrypted in transit and at rest
+- Only users with dashboard access can use the Copilot
+- Conversations are automatically deleted after 90 days
+- The Copilot cannot execute commands (read-only access)
+</Info>
+
+<Warning>
+**Never share sensitive data** like production API keys or passwords in Copilot conversations.
+</Warning>

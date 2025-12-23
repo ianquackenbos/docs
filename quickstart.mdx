@@ -1,80 +1,436 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: "Get Shardly up and running in under 5 minutes"
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, ensure you have:
 
-### Step 1: Set up your local environment
+- **Docker** and **Docker Compose** installed (version 20.10+ recommended)
+- An **Elastic Cloud** account with at least one deployment
+- An **Elastic Cloud API key** with read access to billing and deployments
+- **Clerk account** for authentication ([sign up free](https://clerk.com))
+- **Anthropic API key** for AI Copilot ([get one here](https://console.anthropic.com))
+
+<Info>
+Don't have an Elastic Cloud deployment yet? [Start a 14-day free trial](https://cloud.elastic.co/registration)
+</Info>
+
+## Setup Steps
+
+<Steps>
+<Step title="Clone the repository">
+Clone the Shardly repository to your local machine:
+
+```bash
+git clone https://github.com/shardly/shardly.git
+cd shardly
+```
+
+<Check>
+Verify you're in the correct directory by running `ls` - you should see `docker-compose.yml`
+</Check>
+</Step>
+
+<Step title="Generate encryption key">
+Generate a secure encryption key for storing API credentials:
+
+```bash
+openssl rand -base64 32
+```
+
+Copy the output (it will look like `dGhpc2lzYXNlY3VyZWVuY3J5cHRpb25rZXk=`). You'll need this in the next step.
+
+<Tip>
+Save this key securely - you'll need it every time you start Shardly, and losing it means you'll need to re-enter all API credentials.
+</Tip>
+</Step>
+
+<Step title="Configure environment variables">
+Create your environment configuration file:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` in your text editor and configure the following variables:
+
+```bash .env
+# Database (keep defaults for local development)
+DATABASE_URL=postgresql://shardly:shardly@postgres:5432/shardly
+
+# Redis (keep defaults for local development)
+REDIS_URL=redis://redis:6379/0
+
+# Security - Paste the encryption key from Step 2
+ENCRYPTION_KEY=dGhpc2lzYXNlY3VyZWVuY3J5cHRpb25rZXk=
+
+# Clerk Authentication (get from https://dashboard.clerk.com)
+CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxx
+CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxx
+CLERK_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+
+# Anthropic (get from https://console.anthropic.com)
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxx
+
+# CORS (adjust for your domain in production)
+CORS_ORIGINS=["http://localhost:3000"]
+```
+
+<Warning>
+**Never commit your `.env` file to version control.** It contains sensitive API keys and credentials. The `.gitignore` file should already exclude it.
+</Warning>
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
+<Accordion title="How to get Clerk credentials">
+1. Sign up at [clerk.com](https://clerk.com) (free tier available)
+2. Create a new application
+3. Go to **API Keys** in the sidebar
+4. Copy your **Publishable Key** and **Secret Key**
+5. Go to **Webhooks** → Create endpoint → `http://localhost:8000/api/v1/webhooks/clerk`
+6. Copy the **Signing Secret** as `CLERK_WEBHOOK_SECRET`
 </Accordion>
 
-## Next steps
+<Accordion title="How to get Anthropic API key">
+1. Visit [console.anthropic.com](https://console.anthropic.com)
+2. Sign up or log in
+3. Navigate to **API Keys**
+4. Click **Create Key**
+5. Copy the key (starts with `sk-ant-`)
+</Accordion>
+</AccordionGroup>
+</Step>
 
-Now that you have your docs running, explore these key features:
+<Step title="Start all services">
+Launch Shardly using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+This command starts five services:
+- **PostgreSQL** (with TimescaleDB extension) - Stores all Shardly data
+- **Redis** - Task queue and caching layer
+- **Backend API** - FastAPI application on port 8000
+- **Celery Worker** - Background job processor for data collection
+- **Frontend** - Next.js application on port 3000
+
+<Tip>
+The initial Docker image build may take 3-5 minutes. Subsequent starts will be much faster.
+</Tip>
+
+Verify all services are running:
+
+```bash
+docker-compose ps
+```
+
+You should see five containers with status "Up":
+
+```
+NAME                STATUS
+shardly-postgres    Up 30 seconds
+shardly-redis       Up 30 seconds
+shardly-backend     Up 25 seconds
+shardly-celery      Up 25 seconds
+shardly-frontend    Up 25 seconds
+```
+
+<Check>
+All five services show "Up" status
+</Check>
+</Step>
+
+<Step title="Run database migrations">
+Initialize the database schema:
+
+```bash
+docker-compose exec backend alembic upgrade head
+```
+
+Expected output:
+
+```
+INFO  [alembic.runtime.migration] Running upgrade -> 001_initial_schema
+INFO  [alembic.runtime.migration] Running upgrade 001 -> head
+```
+
+<Check>
+You see "Running upgrade" messages without errors
+</Check>
+</Step>
+
+<Step title="Access the dashboard">
+Open your browser and navigate to:
+
+```
+http://localhost:3000
+```
+
+You'll be redirected to the Clerk sign-in page. Create an account or sign in with an existing one.
+
+<Frame>
+<img src="/images/sign-in.png" alt="Clerk sign-in page with email and social login options" />
+</Frame>
+
+After signing in, you'll see the Shardly dashboard.
+
+<Check>
+You can access the dashboard and see the main navigation
+</Check>
+</Step>
+
+<Step title="Connect your Elastic Cloud organization">
+Now connect Shardly to your Elastic Cloud account:
+
+1. Click **Connections** in the left sidebar
+2. Click the **Add Connection** button
+3. Fill in the connection form:
+
+<ParamField body="name" type="string" required>
+A friendly name for this connection (e.g., "Production" or "My Organization")
+</ParamField>
+
+<ParamField body="organization_id" type="string" required>
+Your Elastic Cloud organization ID. Find this in the Elastic Cloud console under **Organization Settings** → **Organization ID**
+</ParamField>
+
+<ParamField body="api_key" type="string" required>
+An Elastic Cloud API key with read access. Create one at [cloud.elastic.co/account/keys](https://cloud.elastic.co/account/keys)
+</ParamField>
+
+<Info>
+Your API key needs these permissions:
+- **Billing**: Read access to costs and usage data
+- **Deployments**: Read access to deployment details
+- **Elasticsearch**: Read access to cluster APIs
+</Info>
+
+4. Click **Save Connection**
+
+<Check>
+Connection status shows "Connected" with a green indicator
+</Check>
+</Step>
+
+<Step title="Wait for initial data sync">
+Shardly will now automatically:
+
+1. Discover all deployments in your organization
+2. Fetch billing data from the Costs Analysis API
+3. Collect cluster metrics (indices, shards, nodes)
+4. Calculate index-level costs
+5. Generate optimization recommendations
+
+This process runs in the background and typically takes 2-5 minutes for the initial sync.
+
+<Frame>
+<img src="/images/initial-sync.png" alt="Dashboard showing data collection in progress with loading indicators" />
+</Frame>
+
+You can monitor progress in the **Dashboard** - cards will populate as data arrives.
+
+<Tip>
+The Celery worker logs show detailed sync progress. View them with:
+```bash
+docker-compose logs -f celery
+```
+</Tip>
+
+<Check>
+Dashboard shows cost data and at least one deployment
+</Check>
+</Step>
+</Steps>
+
+## What's next?
+
+Now that Shardly is running, explore these key features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Explore cost analysis"
+    icon="chart-bar"
+    href="/features/cost-analysis"
+  >
+    See exactly where your Elasticsearch spending goes with index-level cost breakdowns
+  </Card>
+  <Card
+    title="Review recommendations"
+    icon="lightbulb"
+    href="/features/recommendations"
+  >
+    Discover optimization opportunities with estimated savings
+  </Card>
+  <Card
+    title="Auto-apply optimizations"
+    icon="play"
+    href="/features/auto-apply"
+  >
+    Learn how to automatically apply recommendations with one click
+  </Card>
+  <Card
+    title="Configure cost attribution"
+    icon="users"
+    href="/configuration/teams"
+  >
+    Set up rules to attribute costs to teams and projects
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title="Backend won't start">
+**Symptom**: The backend container exits immediately or shows error status
+
+**Diagnosis**: Check the backend logs:
+
+```bash
+docker-compose logs backend
+```
+
+**Common causes**:
+
+1. **Missing environment variables**
+   - Error: `KeyError: 'CLERK_SECRET_KEY'`
+   - Solution: Verify all required variables are set in `.env`
+
+2. **Database connection failed**
+   - Error: `could not connect to server: Connection refused`
+   - Solution: Ensure PostgreSQL is running: `docker-compose ps postgres`
+
+3. **Invalid encryption key format**
+   - Error: `ValueError: Fernet key must be 32 url-safe base64-encoded bytes`
+   - Solution: Regenerate key with `openssl rand -base64 32`
+
+<Tip>
+Restart the backend after fixing `.env`: `docker-compose restart backend`
+</Tip>
+</Accordion>
+
+<Accordion title="Frontend shows 500 error">
+**Symptom**: Browser shows "500 Internal Server Error" or blank page
+
+**Diagnosis**: Check frontend logs:
+
+```bash
+docker-compose logs frontend
+```
+
+**Common causes**:
+
+1. **Missing Clerk keys**
+   - Error: `CLERK_SECRET_KEY is required`
+   - Solution: Add Clerk credentials to `.env`
+
+2. **Backend API not reachable**
+   - Error: `ECONNREFUSED 127.0.0.1:8000`
+   - Solution: Verify backend is running: `docker-compose ps backend`
+
+3. **Port already in use**
+   - Error: `port 3000 is already allocated`
+   - Solution: Stop other services on port 3000 or change `FRONTEND_PORT` in `.env`
+</Accordion>
+
+<Accordion title="No data appearing in dashboard">
+**Symptom**: Dashboard loads but shows no deployments or cost data
+
+**Diagnosis**: Follow these steps:
+
+1. **Check connection status**
+   - Navigate to **Connections** page
+   - Verify status shows "Connected" (green)
+   - If "Error" (red), click on connection to see error details
+
+2. **Verify API key permissions**
+   - Error: `403 Forbidden`
+   - Solution: Ensure your Elastic Cloud API key has read access to billing and deployments
+
+3. **Check Celery worker logs**
+
+```bash
+docker-compose logs celery
+```
+
+Look for error messages during data collection.
+
+4. **Manually trigger sync**
+   - Go to **Connections** page
+   - Click the **Sync Now** button on your connection
+   - Wait 2-3 minutes and refresh the dashboard
+
+<Info>
+First sync can take 5-10 minutes for organizations with many deployments
+</Info>
+</Accordion>
+
+<Accordion title="Recommendations not generating">
+**Symptom**: Cost data appears but no recommendations shown
+
+**Diagnosis**:
+
+1. **Wait for full data collection**
+   - Recommendations require complete cluster data
+   - Initial generation happens after first successful sync
+
+2. **Check recommendation criteria**
+   - Shardly only generates recommendations when issues are detected
+   - If your cluster is already optimized, you may have zero recommendations
+
+3. **Verify cluster access**
+   - Recommendations require direct Elasticsearch API access
+   - Check Celery logs for Elasticsearch connection errors
+
+<Tip>
+Force recommendation generation by navigating to a deployment detail page and clicking **Analyze Now**
+</Tip>
+</Accordion>
+
+<Accordion title="Docker containers keep restarting">
+**Symptom**: `docker-compose ps` shows containers constantly restarting
+
+**Diagnosis**:
+
+1. **Check system resources**
+   - Shardly requires at least 4GB RAM and 2 CPU cores
+   - Increase Docker Desktop resource limits in Settings → Resources
+
+2. **Database initialization failed**
+
+```bash
+docker-compose logs postgres
+```
+
+   - If you see corruption errors, reset the database:
+
+```bash
+docker-compose down -v  # ⚠️ This deletes all data
+docker-compose up -d
+```
+
+3. **Port conflicts**
+   - Check if ports 3000, 8000, 5432, or 6379 are already in use
+   - Modify ports in `docker-compose.yml` if needed
+</Accordion>
+</AccordionGroup>
+
+## Getting help
+
+If you're still experiencing issues:
+
+<CardGroup cols={3}>
+<Card title="Discord community" icon="discord" href="https://discord.gg/shardly">
+Get help from other Shardly users
+</Card>
+
+<Card title="GitHub issues" icon="github" href="https://github.com/shardly/shardly/issues">
+Report bugs or request features
+</Card>
+
+<Card title="Email support" icon="envelope" href="mailto:support@shardly.io">
+Contact the Shardly team directly
+</Card>
+</CardGroup>
+

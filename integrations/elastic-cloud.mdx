@@ -1,0 +1,397 @@
+---
+title: Elastic Cloud Integration
+description: "Connect Shardly to your Elastic Cloud deployments"
+---
+
+## Overview
+
+Shardly integrates seamlessly with Elastic Cloud to collect billing data, deployment metrics, and cluster telemetry. This guide walks you through connecting your Elastic Cloud organization to Shardly.
+
+<Info>
+**Primary use case:** Shardly is designed for Elastic Cloud. All features work automatically once connected.
+</Info>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- An **Elastic Cloud account** with at least one deployment
+- **Admin or billing access** to your Elastic Cloud organization
+- Ability to create **API keys** in Elastic Cloud
+
+## Connecting your organization
+
+<Steps>
+<Step title="Create an Elastic Cloud API key">
+
+Navigate to your Elastic Cloud console and create an API key with the necessary permissions.
+
+1. Log in to [cloud.elastic.co](https://cloud.elastic.co)
+2. Click your **organization name** in the top-left corner
+3. Navigate to **Features** → **API keys**
+4. Click **Create API key**
+
+<Frame>
+<img src="/images/elastic-cloud-api-keys.png" alt="Elastic Cloud console showing API keys page with Create API key button highlighted" />
+</Frame>
+
+### Required permissions
+
+Configure your API key with these permissions:
+
+| Permission | Required | Purpose |
+|------------|----------|---------|
+| **Organization: Read billing** | ✅ | Access cost and usage data from Billing API |
+| **Organization: Read deployments** | ✅ | List all deployments in your organization |
+| **Deployment: Read** | ✅ | Get deployment configuration and details |
+| **Elasticsearch: Read** | ✅ | Collect cluster metrics via ES APIs |
+
+<Warning>
+**The API key is only shown once.** Copy it immediately after creation and store it securely. You cannot retrieve it later.
+</Warning>
+
+<Check>
+API key created and saved securely
+</Check>
+</Step>
+
+<Step title="Find your Organization ID">
+
+You'll need your Elastic Cloud Organization ID to complete the connection.
+
+**Option 1: From Organization Settings**
+1. Click your organization name in Elastic Cloud
+2. Go to **Organization settings**
+3. Copy the **Organization ID** (looks like `org-abc123def456`)
+
+**Option 2: From URL**
+The Organization ID appears in your browser's address bar:
+
+```
+https://cloud.elastic.co/account/organizations/{ORG_ID}/settings
+                                                 ↑
+                                          Copy this part
+```
+
+<Check>
+Organization ID copied
+</Check>
+</Step>
+
+<Step title="Add connection in Shardly">
+
+Now connect your Elastic Cloud organization to Shardly.
+
+<Tabs>
+<Tab title="Via Dashboard">
+1. Navigate to **Connections** in the Shardly sidebar
+2. Click **Add Connection**  
+3. Select **Elastic Cloud** tab
+4. Fill in the form:
+   - **Name**: A friendly name (e.g., "Production" or "Company Name")
+   - **Organization ID**: Paste from Step 2
+   - **API Key**: Paste from Step 1
+5. Click **Test Connection** to verify
+6. Click **Add Connection**
+
+<Frame>
+<img src="/images/add-elastic-cloud-connection.png" alt="Shardly add connection form with fields for name, organization ID, and API key" />
+</Frame>
+</Tab>
+
+<Tab title="Via API">
+```bash
+curl -X POST "https://api.shardly.io/api/v1/connections" \
+  -H "Authorization: Bearer $SHARDLY_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Production",
+    "elastic_cloud_org_id": "org-abc123def456",
+    "elastic_api_key": "your-api-key-here"
+  }'
+```
+
+Response:
+```json
+{
+  "id": "conn-xyz789",
+  "name": "Production",
+  "status": "active",
+  "deployments_count": 5,
+  "created_at": "2024-08-15T10:30:00Z"
+}
+```
+</Tab>
+</Tabs>
+
+<Check>
+Connection shows "Active" status in Shardly
+</Check>
+</Step>
+
+<Step title="Wait for initial sync">
+
+Shardly automatically discovers and syncs data from your Elastic Cloud organization.
+
+**What happens during initial sync:**
+1. **Discovery** (30 seconds) - Find all deployments in your organization
+2. **Billing sync** (1-2 minutes) - Fetch historical cost data
+3. **Cluster metrics** (2-5 minutes) - Collect index, shard, and node data
+4. **Cost calculation** (1-2 minutes) - Calculate index-level costs
+5. **Recommendations** (2-3 minutes) - Generate optimization suggestions
+
+<Info>
+**Total time:** First sync typically takes 5-10 minutes depending on the number of deployments and amount of data.
+</Info>
+
+You can monitor progress in the Connections page. Once complete, you'll see:
+- Deployment count
+- Total monthly cost
+- Number of recommendations
+
+<Check>
+Initial sync complete - data appears in dashboard
+</Check>
+</Step>
+</Steps>
+
+## What data gets collected
+
+### Billing data (from Elastic Cloud API)
+
+Shardly collects cost information to provide visibility and forecasting:
+
+| Data Type | Source | Collection Frequency | Retention |
+|-----------|--------|---------------------|-----------|
+| **Total organization costs** | Billing Costs Analysis API | Every 6 hours | 12+ months |
+| **Deployment-level costs** | Billing Costs Analysis API | Every 6 hours | 12+ months |
+| **Cost breakdown** | Billing Costs Analysis API | Every 6 hours | 12+ months |
+| *Capacity, storage, data transfer* | | | |
+
+<Tip>
+Shardly uses Elastic Cloud's official Billing API - the same data you see in the Elastic Cloud console, but with additional index-level breakdown.
+</Tip>
+
+### Cluster metrics (from Elasticsearch APIs)
+
+Shardly connects directly to each deployment to collect detailed metrics:
+
+| Data Type | Elasticsearch API | Collection Frequency |
+|-----------|-------------------|---------------------|
+| **Index statistics** | `/_cat/indices` | Every hour |
+| **Shard distribution** | `/_cat/shards` | Every hour |
+| **Node statistics** | `/_nodes/stats` | Every hour |
+| **Node information** | `/_nodes` | Daily |
+| **ILM policies** | `/_ilm/policy` | Daily |
+| **ILM status** | `/_ilm/explain/*` | Hourly |
+| **Index templates** | `/_index_template` | Daily |
+
+<Info>
+**Read-only access:** Shardly only reads data. It never writes to your Elasticsearch clusters unless you explicitly use the auto-apply feature.
+</Info>
+
+## Verifying the connection
+
+<AccordionGroup>
+<Accordion title="Check connection status" icon="circle-check">
+Navigate to **Connections** in Shardly and verify:
+
+✅ Status shows **Active** (green indicator)  
+✅ Last sync timestamp is recent (within last hour)  
+✅ Deployment count matches your Elastic Cloud console  
+✅ No error messages displayed
+</Accordion>
+
+<Accordion title="Verify deployments synced" icon="server">
+Go to **Dashboards** in Shardly and check:
+
+✅ All your Elastic Cloud deployments appear  
+✅ Each deployment shows cost data  
+✅ Index counts match what you see in Kibana  
+✅ Recent data is present (not stale)
+</Accordion>
+
+<Accordion title="Confirm cost data" icon="dollar-sign">
+Review cost information:
+
+✅ Monthly cost matches Elastic Cloud billing  
+✅ Index-level costs are calculated  
+✅ Cost trends show historical data  
+✅ Tier distribution is accurate
+</Accordion>
+
+<Accordion title="Check recommendations" icon="lightbulb">
+After initial sync completes:
+
+✅ Recommendations appear (if optimizations found)  
+✅ Estimated savings are shown  
+✅ Runbooks are generated  
+✅ You can preview commands
+</Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+<Accordion title='Connection status shows "Error"' icon="triangle-exclamation">
+**Symptoms:** Red error indicator on connection, "Failed to connect" message
+
+**Common causes:**
+
+1. **Invalid API key**
+   - Error: `401 Unauthorized`
+   - Solution: Regenerate API key in Elastic Cloud and update in Shardly
+
+2. **Insufficient permissions**
+   - Error: `403 Forbidden - Missing required permissions`
+   - Solution: Ensure API key has all 4 required permissions (billing, deployments, deployment read, elasticsearch read)
+
+3. **Organization ID mismatch**
+   - Error: `404 Organization not found`
+   - Solution: Double-check Organization ID from Elastic Cloud settings
+
+4. **API key expired**
+   - Error: `401 API key expired`
+   - Solution: Create new API key and update connection
+
+<Tip>
+Click the error message in Shardly to see detailed diagnostics and suggested fixes.
+</Tip>
+</Accordion>
+
+<Accordion title="No deployments appearing" icon="server">
+**Symptoms:** Connection is active but no deployments show up
+
+**Diagnosis steps:**
+
+1. **Check Elastic Cloud console**
+   - Verify deployments exist and are running
+   - Confirm you're looking at the correct organization
+
+2. **Verify API key organization scope**
+   - API key must belong to the same organization
+   - Check key permissions include "Read deployments"
+
+3. **Manual sync**
+   - Click **Sync Now** on the connection
+   - Wait 2-3 minutes for sync to complete
+   - Check for error messages
+
+4. **Check logs**
+   - View sync logs in connection details
+   - Look for specific error messages
+</Accordion>
+
+<Accordion title="Cost data missing or incorrect" icon="dollar-sign">
+**Symptoms:** Deployments appear but costs are $0 or don't match Elastic Cloud
+
+**Common causes:**
+
+1. **Billing API access**
+   - Check API key has "Read billing" permission
+   - Some organization roles cannot access billing data
+
+2. **Recent deployment**
+   - Billing data appears with delay (up to 6 hours)
+   - Wait for next billing sync cycle
+
+3. **Free tier or trial**
+   - Cost tracking doesn't work for free/trial deployments
+   - Upgrade to paid plan in Elastic Cloud
+
+<Info>
+Billing data syncs every 6 hours. If you just added the connection, wait up to 6 hours for the first billing sync.
+</Info>
+</Accordion>
+
+<Accordion title="Recommendations not generating" icon="lightbulb">
+**Symptoms:** Connection works, data synced, but no recommendations appear
+
+**This is normal if:**
+- Your cluster is already well-optimized
+- All indices have ILM policies configured
+- Data is properly distributed across tiers
+- Shard counts are appropriate
+
+**To verify:**
+1. Check deployment detail page for analysis status
+2. Look for "No optimizations needed" message
+3. Review cluster metrics manually
+
+<Tip>
+You can manually request analysis by clicking **Analyze Now** on any deployment.
+</Tip>
+</Accordion>
+</AccordionGroup>
+
+## Managing multiple connections
+
+You can connect multiple Elastic Cloud organizations to a single Shardly account:
+
+<CardGroup cols={2}>
+<Card title="Separate organizations" icon="building">
+If you manage multiple Elastic Cloud orgs (e.g., prod and dev), add each as a separate connection.
+</Card>
+
+<Card title="Consolidated view" icon="chart-bar">
+Shardly aggregates costs and recommendations across all connected organizations in one dashboard.
+</Card>
+
+<Card title="Organization-level filtering" icon="filter">
+Use filters to view data for specific organizations or deployments.
+</Card>
+
+<Card title="Independent permissions" icon="key">
+Each connection uses its own API key with organization-specific permissions.
+</Card>
+</CardGroup>
+
+## Security and privacy
+
+<AccordionGroup>
+<Accordion title="How API keys are stored" icon="lock">
+- API keys are encrypted using Fernet (AES-256) before storage
+- Encryption key is never stored in the database
+- Keys are only decrypted in-memory when needed for API calls
+</Accordion>
+
+<Accordion title="What data is stored" icon="database">
+Shardly stores:
+- Billing data (costs, usage)
+- Cluster metrics (indices, shards, nodes)
+- Recommendations and tracking data
+
+Shardly does NOT store:
+- Your actual document data
+- Query logs
+- Application data
+</Accordion>
+
+<Accordion title="API access" icon="shield">
+- All API calls use HTTPS (TLS 1.3)
+- API keys are passed in headers (never in URLs)
+- Shardly never modifies your cluster without explicit auto-apply action
+</Accordion>
+</AccordionGroup>
+
+## Next steps
+
+Once your Elastic Cloud connection is active:
+
+<CardGroup cols={2}>
+<Card title="Explore cost analysis" icon="chart-bar" href="/features/cost-analysis">
+See index-level cost breakdowns and trends
+</Card>
+
+<Card title="Review recommendations" icon="lightbulb" href="/features/recommendations">
+Discover optimization opportunities
+</Card>
+
+<Card title="Set up cost attribution" icon="users" href="/configuration/cost-rules">
+Attribute costs to teams and projects
+</Card>
+
+<Card title="Try auto-apply" icon="play" href="/features/auto-apply">
+Automatically apply optimizations
+</Card>
+</CardGroup>

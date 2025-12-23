@@ -1,33 +1,214 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: API Introduction
+description: "Getting started with the Shardly API"
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Overview
 
-## Welcome
+The Shardly API provides programmatic access to all platform functionality. Use it to:
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+- Automate cost monitoring and reporting
+- Integrate with your CI/CD pipelines
+- Build custom dashboards
+- Trigger optimizations programmatically
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+## Base URL
+
+```
+https://api.shardly.io/api/v1
+```
+
+For self-hosted installations:
+```
+https://your-domain.com/api/v1
+```
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API requests require authentication via Bearer token.
+
+```bash
+curl -X GET "https://api.shardly.io/api/v1/deployments" \
+  -H "Authorization: Bearer YOUR_API_TOKEN"
+```
+
+See [Authentication](/api-reference/authentication) for details on obtaining tokens.
+
+## Request Format
+
+### Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes | Bearer token |
+| `Content-Type` | For POST/PUT | `application/json` |
+| `Accept` | No | `application/json` (default) |
+
+### Request Body
+
+POST and PUT requests accept JSON:
 
 ```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+{
+  "name": "Production Connection",
+  "elastic_cloud_org_id": "abc123",
+  "elastic_api_key": "secret-key"
+}
 ```
+
+## Response Format
+
+All responses are JSON:
+
+```json
+{
+  "id": "conn-123",
+  "name": "Production Connection",
+  "status": "active",
+  "created_at": "2024-08-15T10:30:00Z"
+}
+```
+
+### Pagination
+
+List endpoints support pagination:
+
+```bash
+GET /api/v1/recommendations?limit=20&offset=40
+```
+
+Response includes pagination metadata:
+
+```json
+{
+  "items": [...],
+  "total": 150,
+  "limit": 20,
+  "offset": 40,
+  "has_more": true
+}
+```
+
+### Error Responses
+
+Errors follow a consistent format:
+
+```json
+{
+  "detail": "Recommendation not found",
+  "status_code": 404
+}
+```
+
+Common status codes:
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad Request |
+| 401 | Unauthorized |
+| 403 | Forbidden |
+| 404 | Not Found |
+| 422 | Validation Error |
+| 500 | Server Error |
+
+## Rate Limiting
+
+API requests are rate-limited to ensure fair usage:
+
+| Plan | Requests/Minute | Requests/Day |
+|------|-----------------|--------------|
+| Free | 60 | 1,000 |
+| Pro | 300 | 10,000 |
+| Enterprise | Unlimited | Unlimited |
+
+Rate limit headers are included in responses:
+
+```
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 45
+X-RateLimit-Reset: 1692108900
+```
+
+## API Versioning
+
+The API is versioned via the URL path:
+
+```
+/api/v1/...
+```
+
+We maintain backwards compatibility within major versions. Breaking changes result in a new version.
+
+## SDKs
+
+Official SDKs are coming soon:
+
+- Python SDK
+- JavaScript/TypeScript SDK
+- Go SDK
+
+## OpenAPI Specification
+
+Download the OpenAPI spec for code generation:
+
+```bash
+curl -O https://api.shardly.io/openapi.json
+```
+
+Import into Postman, Insomnia, or generate client libraries.
+
+## Webhooks
+
+Configure webhooks to receive real-time notifications:
+
+- New recommendations detected
+- Execution completed
+- Savings verified
+- Cost anomalies detected
+
+See [Webhooks](/api-reference/webhooks) for configuration details.
+
+## Quick Examples
+
+### Get Current Costs
+
+```bash
+curl -X GET "https://api.shardly.io/api/v1/costs/deployments/dep-123/overview" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### List Recommendations
+
+```bash
+curl -X GET "https://api.shardly.io/api/v1/recommendations?deployment_id=dep-123&status=pending" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Apply a Recommendation
+
+```bash
+# First, validate
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-456/validate" \
+  -H "Authorization: Bearer $TOKEN"
+
+# Then, apply
+curl -X POST "https://api.shardly.io/api/v1/recommendations/rec-456/apply" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"notes": "Applied via automation"}'
+```
+
+### Ask the Copilot
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/copilot/chat" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Why are my costs increasing?",
+    "deployment_id": "dep-123"
+  }'
+```
+

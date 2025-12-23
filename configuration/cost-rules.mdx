@@ -1,0 +1,375 @@
+---
+title: Cost Attribution Rules
+description: "Configure how costs are attributed to teams and projects"
+---
+
+## Overview
+
+Cost attribution rules map indices to teams, projects, or cost centers. This enables chargeback, cost accountability, and team-level reporting.
+
+## How Attribution Works
+
+```
+Index: logs-frontend-prod-2024.08.15
+           │
+           ▼
+┌─────────────────────────────────┐
+│      Attribution Rules          │
+├─────────────────────────────────┤
+│ 1. logs-frontend-* → Frontend   │  ← Match!
+│ 2. logs-backend-* → Backend     │
+│ 3. logs-* → Platform            │
+│ 4. * → Unattributed             │
+└─────────────────────────────────┘
+           │
+           ▼
+    Team: Frontend
+    Project: Web Application
+```
+
+## Creating Rules
+
+### Via Dashboard
+
+1. Navigate to **Settings → Cost Rules**
+2. Click **Add Rule**
+3. Configure the rule:
+   - **Name**: Descriptive name
+   - **Pattern**: Index pattern to match
+   - **Pattern Type**: Prefix, suffix, regex, or exact
+   - **Team**: Team to attribute to
+   - **Project**: (Optional) Project name
+   - **Priority**: Order of evaluation (lower = first)
+
+### Via API
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/cost-rules" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Frontend Logs",
+    "pattern": "logs-frontend-*",
+    "pattern_type": "prefix",
+    "team": "Frontend",
+    "project": "Web Application",
+    "priority": 1
+  }'
+```
+
+## Pattern Types
+
+### Prefix Match
+
+Matches indices starting with the pattern:
+
+```yaml
+pattern: "logs-frontend-"
+pattern_type: prefix
+
+Matches:
+  ✅ logs-frontend-prod-2024.08
+  ✅ logs-frontend-staging
+  ❌ frontend-logs-prod
+```
+
+### Suffix Match
+
+Matches indices ending with the pattern:
+
+```yaml
+pattern: "-prod"
+pattern_type: suffix
+
+Matches:
+  ✅ logs-frontend-prod
+  ✅ metrics-api-prod
+  ❌ prod-logs
+```
+
+### Wildcard
+
+Use `*` as a wildcard:
+
+```yaml
+pattern: "logs-*-prod"
+pattern_type: wildcard
+
+Matches:
+  ✅ logs-frontend-prod
+  ✅ logs-api-prod
+  ❌ logs-staging
+```
+
+### Regex
+
+Full regular expression support:
+
+```yaml
+pattern: "^logs-(frontend|mobile)-.*$"
+pattern_type: regex
+
+Matches:
+  ✅ logs-frontend-prod
+  ✅ logs-mobile-ios
+  ❌ logs-backend-prod
+```
+
+### Exact
+
+Exact match only:
+
+```yaml
+pattern: ".kibana"
+pattern_type: exact
+
+Matches:
+  ✅ .kibana
+  ❌ .kibana_1
+```
+
+## Rule Priority
+
+Rules are evaluated in priority order (lowest number first). First match wins.
+
+### Example
+
+```yaml
+# Priority 1: Specific team rules
+- pattern: "logs-frontend-*"
+  team: Frontend
+  priority: 1
+
+# Priority 2: Catch-all for logs
+- pattern: "logs-*"
+  team: Platform
+  priority: 2
+
+# Priority 3: Everything else
+- pattern: "*"
+  team: Unattributed
+  priority: 3
+```
+
+With this configuration:
+- `logs-frontend-prod` → Frontend (rule 1)
+- `logs-backend-prod` → Platform (rule 2)
+- `metrics-prod` → Unattributed (rule 3)
+
+## Teams and Projects
+
+### Team Structure
+
+```yaml
+teams:
+  - name: Frontend
+    cost_center: "CC-100"
+    email: frontend@company.com
+    
+  - name: Backend
+    cost_center: "CC-200"
+    email: backend@company.com
+```
+
+### Project Hierarchy
+
+```yaml
+projects:
+  - name: Web Application
+    team: Frontend
+    budget: 5000
+    
+  - name: Mobile App
+    team: Frontend
+    budget: 3000
+```
+
+## Viewing Attribution
+
+### Dashboard
+
+The Cost Analysis page shows costs by team:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   COSTS BY TEAM                          │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  Frontend      ████████████████████           $4,200    │
+│  Backend       ████████████████               $3,100    │
+│  Platform      ██████████████                 $2,800    │
+│  Data Science  ████████                       $1,500    │
+│  Unattributed  ████                           $900      │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### API
+
+```bash
+# Get costs by team
+curl "https://api.shardly.io/api/v1/costs/deployments/{id}/by-team"
+
+# Response
+{
+  "teams": [
+    {"team": "Frontend", "monthly_cost": 4200, "index_count": 45},
+    {"team": "Backend", "monthly_cost": 3100, "index_count": 32}
+  ]
+}
+```
+
+## Managing Unattributed Costs
+
+### View Unattributed Indices
+
+```bash
+curl "https://api.shardly.io/api/v1/costs/deployments/{id}/indices?unattributed=true"
+```
+
+### Create Rules for Unattributed
+
+Identify patterns and create rules:
+
+```bash
+# Find common patterns
+GET /api/v1/costs/deployments/{id}/indices/patterns
+
+# Response
+{
+  "patterns": [
+    {"pattern": "events-*", "count": 12, "monthly_cost": 450},
+    {"pattern": "audit-*", "count": 8, "monthly_cost": 280}
+  ]
+}
+```
+
+### Goal: Zero Unattributed
+
+Track attribution coverage:
+
+```bash
+GET /api/v1/costs/deployments/{id}/attribution-coverage
+
+# Response
+{
+  "total_indices": 150,
+  "attributed_indices": 138,
+  "unattributed_indices": 12,
+  "coverage_percent": 92
+}
+```
+
+## Budget Alerts
+
+Set budgets and get alerts:
+
+```yaml
+budgets:
+  - team: Frontend
+    monthly_limit: 5000
+    alert_at: [80, 100]  # Alert at 80% and 100%
+    
+  - project: Web Application
+    monthly_limit: 3000
+    alert_at: [90]
+```
+
+### API
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/budgets" \
+  -d '{
+    "team": "Frontend",
+    "monthly_limit": 5000,
+    "alerts": [
+      {"threshold_percent": 80, "notification": "email"},
+      {"threshold_percent": 100, "notification": "slack"}
+    ]
+  }'
+```
+
+## Best Practices
+
+### 1. Start Broad, Then Refine
+
+```yaml
+# Week 1: Basic team attribution
+- pattern: "logs-*"
+  team: Engineering
+  
+# Week 2: Split by service
+- pattern: "logs-frontend-*"
+  team: Frontend
+- pattern: "logs-backend-*"
+  team: Backend
+- pattern: "logs-*"
+  team: Platform
+```
+
+### 2. Use Consistent Naming
+
+Establish naming conventions:
+
+```
+{type}-{service}-{environment}
+
+Examples:
+- logs-frontend-prod
+- metrics-api-staging
+- traces-mobile-dev
+```
+
+### 3. Review Regularly
+
+- Monthly: Review unattributed costs
+- Quarterly: Update rules for new services
+- Yearly: Review team/project structure
+
+### 4. Automate Rule Creation
+
+```python
+# When a new service is deployed
+def on_new_service(service_name, team):
+    create_cost_rule(
+        pattern=f"*-{service_name}-*",
+        team=team,
+        project=service_name
+    )
+```
+
+## Import/Export
+
+### Export Rules
+
+```bash
+curl "https://api.shardly.io/api/v1/cost-rules/export" > rules.yaml
+```
+
+### Import Rules
+
+```bash
+curl -X POST "https://api.shardly.io/api/v1/cost-rules/import" \
+  -F "file=@rules.yaml"
+```
+
+### Example YAML
+
+```yaml
+version: 1
+rules:
+  - name: Frontend Logs
+    pattern: logs-frontend-*
+    pattern_type: prefix
+    team: Frontend
+    project: Web App
+    priority: 1
+    
+  - name: Backend Logs
+    pattern: logs-backend-*
+    pattern_type: prefix
+    team: Backend
+    project: API
+    priority: 2
+```
+
